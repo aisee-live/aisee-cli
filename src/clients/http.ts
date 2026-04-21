@@ -1,0 +1,88 @@
+import axios, { AxiosInstance } from "axios";
+import { loadCredentials, saveCredentials, clearCredentials, loadSettings, Settings } from "../utils/config.ts";
+import { authClient } from "./auth.ts";
+
+let isRefreshing = false;
+let failedQueue: any[] = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
+  const instance = axios.create();
+
+  instance.interceptors.request.use(async (config) => {
+    const settings = await loadSettings();
+    const creds = await loadCredentials();
+    
+    config.baseURL = settings[serviceType];
+    
+    if (creds?.accessToken) {
+      config.headers.Authorization = `Bearer ${creds.accessToken}`;
+    }
+    return config;
+  });
+
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config;
+
+      if (error.response?.status === 401 && !originalRequest._retry) {
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          })
+            .then(token => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              return instance(originalRequest);
+            })
+            .catch(err => Promise.reject(err));
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+          const creds = await loadCredentials();
+          if (!creds?.refreshToken) {
+            throw new Error("No refresh token available");
+          }
+
+          const result = await authClient.getAccessToken(creds.refreshToken);
+          
+          await saveCredentials({
+            ...creds,
+            accessToken: result.access_token,
+          });
+
+          processQueue(null, result.access_token);
+          originalRequest.headers.Authorization = `Bearer ${result.access_token}`;
+          return instance(originalRequest);
+        } catch (refreshError) {
+          processQueue(refreshError, null);
+          await clearCredentials();
+          console.error("\nSession expired. Please login again using 'aisee login'.");
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
+      }
+
+      return Promise.reject(error);
+    }
+  );
+
+  return instance;
+};
+
+export const analysisAxios = createAxiosInstance("analysisApiUrl");
+export const postAgentAxios = createAxiosInstance("postAgentApiUrl");

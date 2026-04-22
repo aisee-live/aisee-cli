@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
 import { Config } from "apcore-js";
+import chalk from "chalk";
 
 export interface Credentials {
   userId: string;
@@ -78,7 +79,10 @@ export async function initDefaultConfig() {
   try {
     await access(SETTINGS_FILE);
   } catch {
+    // File doesn't exist, create it from template
     await writeFile(SETTINGS_FILE, SETTINGS_TEMPLATE);
+    console.log(`\n${chalk.yellow("i")} Created default configuration at ${chalk.blue(SETTINGS_FILE)}`);
+    console.log(`${chalk.yellow("i")} Edit this file if you need to point to a local development server.\n`);
   }
 }
 
@@ -87,7 +91,11 @@ export async function initDefaultConfig() {
  */
 export async function getAppConfig(): Promise<Config> {
   await initDefaultConfig();
-  return Config.load(SETTINGS_FILE);
+  const config = Config.load(SETTINGS_FILE);
+  if (!config) {
+    throw new Error(`Failed to load configuration from ${SETTINGS_FILE}`);
+  }
+  return config;
 }
 
 /**

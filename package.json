@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "bun run src/index.ts",
-    "build": "bun build ./src/index.ts --compile --outfile aisee"
+    "build": "bun build ./src/index.ts --compile --outfile aisee",
+    "sync-openapi": "bun run scripts/sync-openapi.ts"
   },
   "dependencies": {
     "apcore": "file:../../aipartnerup/apcore-typescript",

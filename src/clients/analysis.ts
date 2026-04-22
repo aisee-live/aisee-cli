@@ -40,5 +40,10 @@ export const analysisClient = {
       channel_id: channelId
     });
     return response.data;
-  }
+  },
+
+  async getUserInfo(userId: string) {
+    const response = await analysisAxios.get(`/user/${userId}`);
+    return response.data;
+  },
 };

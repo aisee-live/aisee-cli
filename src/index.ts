@@ -19,7 +19,7 @@ import {
   channelAddModule,
   channelRemoveModule
 } from "./modules/post/index.ts";
-import { configListModule, configSetModule } from "./modules/config.ts";
+import { configListModule, configSetModule, configSpecModule } from "./modules/config.ts";
 import { Command } from "commander";
 
 class RegistryAdapter {
@@ -88,6 +88,7 @@ function patchCommandForPositionalArgs(cmd: Command, argNames: string[]) {
 const registry = new Registry();
 registry.register("aisee_config.list", configListModule);
 registry.register("aisee_config.set", configSetModule);
+registry.register("aisee_config.spec", configSpecModule);
 registry.register("auth.login", loginModule);
 registry.register("auth.logout", logoutModule);
 registry.register("auth.whoami", whoamiModule);
@@ -129,7 +130,6 @@ async function main() {
     for (const groupName of groupNames) {
       if (["list", "describe", "init", "help", "validate", "describe-pipeline"].includes(groupName)) continue;
       
-      // getCommand will create the LazyGroup and add it to groupCache
       const groupCmd = grouped.getCommand(groupName);
       if (groupCmd) {
         const lazyGroup = (grouped as any).groupCache.get(groupName);
@@ -148,6 +148,11 @@ async function main() {
             if (remove) patchCommandForPositionalArgs(remove, ["<id>"]);
           }
         }
+        if (groupName === "aisee_config") {
+          const specCmd = lazyGroup.getCommand("spec");
+          if (specCmd) patchCommandForPositionalArgs(specCmd, ["<service>"]);
+        }
+
         cli.addCommand(groupCmd);
       }
     }

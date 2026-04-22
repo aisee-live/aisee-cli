@@ -2,35 +2,37 @@ import { z } from "zod";
 import { analysisClient } from "../../clients/analysis.ts";
 
 export const scanModule = {
-  description: "Scan a website for AEO analysis",
+  description: "Start AEO analysis for a product with complete task orchestration",
   inputSchema: z.object({
-    url: z.string().describe("Website URL to scan"),
-    platform: z.string().optional().describe("Specify platforms (comma-separated)"),
-    rescan: z.boolean().default(false).describe("Force a re-scan")
+    url: z.string().url().describe("Website URL to scan"),
+    task_template_id: z.string().optional().describe("Specify a custom task template ID"),
+    stream: z.boolean().default(false).describe("Enable streaming output"),
+    use_demo: z.boolean().default(false).describe("Use demo mode for testing (no credits consumed)")
   }),
-  outputSchema: z.any(),
+  outputSchema: z.object({
+    task_id: z.string(),
+    product_id: z.string(),
+    status: z.string(),
+    created_at: z.string()
+  }),
   async execute(input: any) {
     return await analysisClient.scan(input.url, {
-      platform: input.platform,
-      rescan: input.rescan
+      task_template_id: input.task_template_id,
+      stream: input.stream,
+      use_demo: input.use_demo
     });
   }
 };
 
 export const reportModule = {
-  description: "View analysis report",
+  description: "Retrieve aggregated analysis reports for a product",
   inputSchema: z.object({
-    url: z.string().describe("Website URL"),
-    section: z.string().optional().describe("Specific section to view"),
-    version: z.string().optional().describe("Report version"),
-    history: z.boolean().default(false).describe("Show report history")
+    url: z.string().describe("Website URL associated with the product"),
+    section: z.enum(["summary", "ai-presence", "competitor", "strategy", "seo", "mentions"]).optional().default("summary").describe("Specific report section"),
+    version: z.string().optional().describe("Fetch a specific historical version")
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    if (input.history) {
-      // In a real implementation, call a history endpoint
-      return { message: "History feature coming soon" };
-    }
     return await analysisClient.getReport(input.url, {
       section: input.section,
       version: input.version
@@ -39,10 +41,21 @@ export const reportModule = {
 };
 
 export const actionsListModule = {
-  description: "List tasks/actions for a website",
+  description: "List actionable optimization tasks",
   inputSchema: z.object({
     url: z.string().describe("Website URL"),
-    module: z.string().optional().describe("Filter by module (e.g., strategy, competitor)")
+    page: z.number().int().min(1).default(1),
+    size: z.number().int().min(1).max(1000).default(10),
+    sort_by: z.string().default("position"),
+    sort_order: z.enum(["asc", "desc"]).default("asc"),
+    status: z.string().optional().describe("Filter by status (pending, in_progress, completed...)")
+  }),
+  outputSchema: z.object({
+    items: z.array(z.any()),
+    total: z.number(),
+    page: z.number(),
+    size: z.number(),
+    pages: z.number()
   }),
   async execute(input: any) {
     return await analysisClient.getActions(input.url, input.module);
@@ -50,10 +63,16 @@ export const actionsListModule = {
 };
 
 export const actionsSuggestModule = {
-  description: "Get AI suggestion for a specific task",
+  description: "Get detailed AI implementation suggestions",
   inputSchema: z.object({
     url: z.string().describe("Website URL"),
-    taskId: z.string().describe("Task ID")
+    taskId: z.string().describe("Action ID to generate tasks for"),
+    content_days: z.number().int().min(0).default(7).describe("Number of days of social media posts to generate")
+  }),
+  outputSchema: z.object({
+    status: z.string(),
+    task_id: z.string().optional(),
+    tasks: z.array(z.any()).optional()
   }),
   async execute(input: any) {
     return await analysisClient.getSuggestion(input.url, input.taskId);
@@ -61,12 +80,13 @@ export const actionsSuggestModule = {
 };
 
 export const actionsPostModule = {
-  description: "Convert a task suggestion into a social media post draft",
+  description: "Convert a task implementation plan into a social media post draft",
   inputSchema: z.object({
     url: z.string().describe("Website URL"),
-    taskId: z.string().describe("Task ID"),
-    channel: z.string().optional().describe("Target channel ID")
+    taskId: z.string().describe("Task ID to convert"),
+    channel: z.string().optional()
   }),
+  outputSchema: z.any(),
   async execute(input: any) {
     return await analysisClient.convertToPost(input.url, input.taskId, input.channel);
   }

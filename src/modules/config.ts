@@ -22,13 +22,21 @@ export const configListModule = {
 };
 
 export const configSetModule = {
-  description: "Update a configuration setting",
+  // ... (existing code)
+};
+
+export const configSpecModule = {
+  description: "View the embedded OpenAPI specifications for internal services",
   inputSchema: z.object({
-    key: z.enum(["authApiUrl", "analysisApiUrl", "postAgentApiUrl"]),
-    value: z.string().url()
+    service: z.enum(["auth", "analysis", "post-agent"]).describe("Service name to view spec for")
   }),
   async execute(input: any) {
-    await saveSettings({ [input.key]: input.value });
-    return { message: `Successfully updated ${input.key} to ${input.value}` };
+    const { getEmbeddedSpec } = await import("../schemas/index.ts");
+    const spec = getEmbeddedSpec(input.service);
+    
+    console.log(chalk.bold(`\nEmbedded OpenAPI Spec for: ${input.service}`));
+    console.log(chalk.gray(`Version: ${spec.info?.version || "Unknown"}`));
+    
+    return spec;
   }
 };

@@ -1,0 +1,6562 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "RootController_getRoot",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stripe": {
+      "post": {
+        "operationId": "StripeController_stripe",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Stripe"
+        ]
+      }
+    },
+    "/auth/can-register": {
+      "get": {
+        "operationId": "AuthController_canRegister",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrgUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/forgot": {
+      "post": {
+        "operationId": "AuthController_forgot",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/forgot-return": {
+      "post": {
+        "operationId": "AuthController_forgotReturn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotReturnPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/oauth/{provider}": {
+      "get": {
+        "operationId": "AuthController_oauthLink",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/activate": {
+      "post": {
+        "operationId": "AuthController_activate",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/resend-activation": {
+      "post": {
+        "operationId": "AuthController_resendActivation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendActivationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/oauth/{provider}/exists": {
+      "post": {
+        "operationId": "AuthController_oauthExists",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/public/agent": {
+      "post": {
+        "operationId": "PublicController_createAgent",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/agencies-list": {
+      "get": {
+        "operationId": "PublicController_getAgencyByUser",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/agencies-list-slug": {
+      "get": {
+        "operationId": "PublicController_getAgencySlug",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/agencies-information/{agency}": {
+      "get": {
+        "operationId": "PublicController_getAgencyInformation",
+        "parameters": [
+          {
+            "name": "agency",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/agencies-list-count": {
+      "get": {
+        "operationId": "PublicController_getAgenciesCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/posts/{id}": {
+      "get": {
+        "operationId": "PublicController_getPreview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/posts/{id}/comments": {
+      "get": {
+        "operationId": "PublicController_getComments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/t": {
+      "post": {
+        "operationId": "PublicController_trackEvent",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/crypto/{path}": {
+      "post": {
+        "operationId": "PublicController_cryptoPost",
+        "parameters": [
+          {
+            "name": "path",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/stream": {
+      "get": {
+        "operationId": "PublicController_streamFile",
+        "parameters": [
+          {
+            "name": "url",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/monitor/queue/{name}": {
+      "get": {
+        "operationId": "MonitorController_getMessagesGroup",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Monitor"
+        ]
+      }
+    },
+    "/internal/users": {
+      "post": {
+        "operationId": "InternalController_createUser",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInternalUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Internal"
+        ]
+      }
+    },
+    "/user/self": {
+      "get": {
+        "operationId": "UsersController_getSelf",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/personal": {
+      "get": {
+        "operationId": "UsersController_getPersonalInformation",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_changePersonal",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserDetailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/impersonate": {
+      "get": {
+        "operationId": "UsersController_getImpersonate",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_setImpersonate",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/email-notifications": {
+      "get": {
+        "operationId": "UsersController_getEmailNotifications",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_updateEmailNotifications",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailNotificationsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/subscription": {
+      "get": {
+        "operationId": "UsersController_getSubscription",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/subscription/tiers": {
+      "get": {
+        "operationId": "UsersController_tiers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/join-org": {
+      "post": {
+        "operationId": "UsersController_joinOrg",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/organizations": {
+      "get": {
+        "operationId": "UsersController_getOrgs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/change-org": {
+      "post": {
+        "operationId": "UsersController_changeOrg",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/logout": {
+      "post": {
+        "operationId": "UsersController_logout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/t": {
+      "post": {
+        "operationId": "UsersController_trackEvent",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/analytics/{integration}": {
+      "get": {
+        "operationId": "AnalyticsController_getIntegration",
+        "parameters": [
+          {
+            "name": "integration",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/analytics/post/{postId}": {
+      "get": {
+        "operationId": "AnalyticsController_getPostAnalytics",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/integrations": {
+      "get": {
+        "operationId": "IntegrationsController_getIntegrations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns all available social integrations"
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "delete": {
+        "operationId": "IntegrationsController_deleteChannel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{identifier}/internal-plugs": {
+      "get": {
+        "operationId": "IntegrationsController_getInternalPlugs",
+        "parameters": [
+          {
+            "name": "identifier",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/customers": {
+      "get": {
+        "operationId": "IntegrationsController_getCustomers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{id}/group": {
+      "put": {
+        "operationId": "IntegrationsController_updateIntegrationGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{id}/customer-name": {
+      "put": {
+        "operationId": "IntegrationsController_updateOnCustomerName",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/list": {
+      "get": {
+        "operationId": "IntegrationsController_getIntegrationList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns all connected integrations for the organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "integrations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{id}/settings": {
+      "post": {
+        "operationId": "IntegrationsController_updateProviderSettings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{id}/nickname": {
+      "post": {
+        "operationId": "IntegrationsController_setNickname",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/profile/{id}": {
+      "get": {
+        "operationId": "IntegrationsController_getIntegrationProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{id}": {
+      "get": {
+        "operationId": "IntegrationsController_getSingleIntegration",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/social/{integration}": {
+      "get": {
+        "operationId": "IntegrationsController_getIntegrationUrl",
+        "parameters": [
+          {
+            "name": "integration",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "refresh",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalUrl",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "onboarding",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{id}/time": {
+      "post": {
+        "operationId": "IntegrationsController_setTime",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/mentions": {
+      "post": {
+        "operationId": "IntegrationsController_mentions",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationFunctionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/function": {
+      "post": {
+        "operationId": "IntegrationsController_functionIntegration",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationFunctionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/social/{integration}/connect": {
+      "post": {
+        "operationId": "IntegrationsController_connectSocialMedia",
+        "parameters": [
+          {
+            "name": "integration",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectIntegrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/disable": {
+      "post": {
+        "operationId": "IntegrationsController_disableChannel",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/provider/{id}/connect": {
+      "post": {
+        "operationId": "IntegrationsController_saveProviderPage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/enable": {
+      "post": {
+        "operationId": "IntegrationsController_enableChannel",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/plug/list": {
+      "get": {
+        "operationId": "IntegrationsController_getPlugList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/{id}/plugs": {
+      "get": {
+        "operationId": "IntegrationsController_getPlugsByIntegrationId",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "post": {
+        "operationId": "IntegrationsController_postPlugsByIntegrationId",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlugDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/plugs/{id}/activate": {
+      "put": {
+        "operationId": "IntegrationsController_changePlugActivation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/telegram/updates": {
+      "get": {
+        "operationId": "IntegrationsController_getUpdates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/settings/team": {
+      "get": {
+        "operationId": "SettingsController_getTeam",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      },
+      "post": {
+        "operationId": "SettingsController_inviteTeamMember",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTeamMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/settings/team/{id}": {
+      "delete": {
+        "operationId": "SettingsController_deleteTeamMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/settings/shortlink": {
+      "get": {
+        "operationId": "SettingsController_getShortlinkPreference",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      },
+      "post": {
+        "operationId": "SettingsController_updateShortlinkPreference",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortlinkPreferenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/posts/{id}/statistics": {
+      "get": {
+        "operationId": "PostsController_getStatistics",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/should-shortlink": {
+      "post": {
+        "operationId": "PostsController_shouldShortlink",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{id}/comments": {
+      "post": {
+        "operationId": "PostsController_createComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/tags": {
+      "get": {
+        "operationId": "PostsController_getTags",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      },
+      "post": {
+        "operationId": "PostsController_createTag",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/tags/{id}": {
+      "put": {
+        "operationId": "PostsController_editTag",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts": {
+      "get": {
+        "operationId": "PostsController_getPosts",
+        "parameters": [
+          {
+            "name": "startDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "display",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "QUEUE",
+                "PUBLISHED",
+                "ERROR",
+                "DRAFT"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "reddit",
+                  "linkedin",
+                  "linkedin-page",
+                  "instagram",
+                  "instagram-standalone",
+                  "facebook",
+                  "youtube",
+                  "tiktok",
+                  "pinterest",
+                  "threads",
+                  "mastodon",
+                  "bluesky",
+                  "medium",
+                  "devto",
+                  "hashnode",
+                  "wordpress",
+                  "discord",
+                  "slack",
+                  "telegram",
+                  "dribbble",
+                  "kick",
+                  "twitch",
+                  "lemmy",
+                  "listmonk",
+                  "gmb",
+                  "wrapcast",
+                  "nostr",
+                  "vk"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns a list of posts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      },
+      "post": {
+        "operationId": "PostsController_createPost",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Creates one or more posts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "postId": {
+                        "type": "string"
+                      },
+                      "integration": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "releaseURL": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/find-slot": {
+      "get": {
+        "operationId": "PostsController_findSlot",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/find-slot/{id}": {
+      "get": {
+        "operationId": "PostsController_findSlotIntegration",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/release-list": {
+      "get": {
+        "operationId": "PostsController_getPostReleases",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/list": {
+      "get": {
+        "operationId": "PostsController_getPostsList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "QUEUE",
+                "PUBLISHED",
+                "ERROR",
+                "DRAFT"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "description": "Filter by provider type (e.g. x, reddit, linkedin)",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "reddit",
+                  "linkedin",
+                  "linkedin-page",
+                  "instagram",
+                  "instagram-standalone",
+                  "facebook",
+                  "youtube",
+                  "tiktok",
+                  "pinterest",
+                  "threads",
+                  "mastodon",
+                  "bluesky",
+                  "medium",
+                  "devto",
+                  "hashnode",
+                  "wordpress",
+                  "discord",
+                  "slack",
+                  "telegram",
+                  "dribbble",
+                  "kick",
+                  "twitch",
+                  "lemmy",
+                  "listmonk",
+                  "gmb",
+                  "wrapcast",
+                  "nostr",
+                  "vk"
+                ]
+              }
+            }
+          },
+          {
+            "name": "sourcePostId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "timeline",
+              "enum": [
+                "templates",
+                "timeline"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "publishDate",
+              "enum": [
+                "publishDate",
+                "createdAt",
+                "updatedAt",
+                "state"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns a paginated list of posts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "number"
+                    },
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/old": {
+      "get": {
+        "operationId": "PostsController_oldPosts",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/group/{group}": {
+      "get": {
+        "operationId": "PostsController_getPostsByGroup",
+        "parameters": [
+          {
+            "name": "group",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{id}": {
+      "get": {
+        "operationId": "PostsController_getPost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/generator/draft": {
+      "post": {
+        "operationId": "PostsController_generatePostsDraft",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGeneratedPostsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/generator": {
+      "post": {
+        "operationId": "PostsController_generatePosts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneratorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{group}": {
+      "delete": {
+        "operationId": "PostsController_deletePost",
+        "parameters": [
+          {
+            "name": "group",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{id}/retry": {
+      "post": {
+        "operationId": "PostsController_retryPost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{id}/date": {
+      "put": {
+        "operationId": "PostsController_changeDate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/separate-posts": {
+      "post": {
+        "operationId": "PostsController_separatePosts",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/media/{id}": {
+      "delete": {
+        "operationId": "MediaController_deleteMedia",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/generate-video": {
+      "post": {
+        "operationId": "MediaController_generateVideo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/generate-image": {
+      "post": {
+        "operationId": "MediaController_generateImage",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/generate-image-with-prompt": {
+      "post": {
+        "operationId": "MediaController_generateImageFromText",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/upload-server": {
+      "post": {
+        "operationId": "MediaController_uploadServer",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/save-media": {
+      "post": {
+        "operationId": "MediaController_saveMedia",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/information": {
+      "post": {
+        "operationId": "MediaController_saveMediaInformation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveMediaInformationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/upload-simple": {
+      "post": {
+        "operationId": "MediaController_uploadSimple",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/{endpoint}": {
+      "post": {
+        "operationId": "MediaController_uploadFile",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media": {
+      "get": {
+        "operationId": "MediaController_getMedia",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/video-options": {
+      "get": {
+        "operationId": "MediaController_getVideos",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/video/function": {
+      "post": {
+        "operationId": "MediaController_videoFunction",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoFunctionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/media/generate-video/{type}/allowed": {
+      "get": {
+        "operationId": "MediaController_generateVideoAllowed",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/billing/check/{id}": {
+      "get": {
+        "operationId": "BillingController_checkId",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/check-discount": {
+      "get": {
+        "operationId": "BillingController_checkDiscount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/apply-discount": {
+      "post": {
+        "operationId": "BillingController_applyDiscount",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/finish-trial": {
+      "post": {
+        "operationId": "BillingController_finishTrial",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/is-trial-finished": {
+      "get": {
+        "operationId": "BillingController_isTrialFinished",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/embedded": {
+      "post": {
+        "operationId": "BillingController_embedded",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingSubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/subscribe": {
+      "post": {
+        "operationId": "BillingController_subscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingSubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/portal": {
+      "get": {
+        "operationId": "BillingController_modifyPayment",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing": {
+      "get": {
+        "operationId": "BillingController_getCurrentBilling",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/cancel": {
+      "post": {
+        "operationId": "BillingController_cancel",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/prorate": {
+      "post": {
+        "operationId": "BillingController_prorate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingSubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/lifetime": {
+      "post": {
+        "operationId": "BillingController_lifetime",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/add-subscription": {
+      "post": {
+        "operationId": "BillingController_addSubscription",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/billing/crypto": {
+      "get": {
+        "operationId": "BillingController_crypto",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Billing"
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "NotificationsController_mainPageList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/list": {
+      "get": {
+        "operationId": "NotificationsController_notifications",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/copilot/chat": {
+      "post": {
+        "operationId": "CopilotController_chatAgent",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/copilot/agent": {
+      "post": {
+        "operationId": "CopilotController_agent",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/copilot/credits": {
+      "get": {
+        "operationId": "CopilotController_calculateCredits",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/copilot/{thread}/list": {
+      "get": {
+        "operationId": "CopilotController_getMessagesList",
+        "parameters": [
+          {
+            "name": "thread",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/copilot/list": {
+      "get": {
+        "operationId": "CopilotController_getList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "operationId": "WebhookController_getStatistics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Webhooks"
+        ]
+      },
+      "post": {
+        "operationId": "WebhookController_createAWebhook",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhooksDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhooks"
+        ]
+      },
+      "put": {
+        "operationId": "WebhookController_updateWebhook",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/webhooks/{id}": {
+      "delete": {
+        "operationId": "WebhookController_deleteWebhook",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/webhooks/send": {
+      "post": {
+        "operationId": "WebhookController_sendWebhook",
+        "parameters": [
+          {
+            "name": "url",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/signatures": {
+      "get": {
+        "operationId": "SignatureController_getSignatures",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Signatures"
+        ]
+      },
+      "post": {
+        "operationId": "SignatureController_createSignature",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignatureDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Signatures"
+        ]
+      }
+    },
+    "/signatures/default": {
+      "get": {
+        "operationId": "SignatureController_getDefaultSignature",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Signatures"
+        ]
+      }
+    },
+    "/signatures/{id}": {
+      "delete": {
+        "operationId": "SignatureController_deleteSignature",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Signatures"
+        ]
+      },
+      "put": {
+        "operationId": "SignatureController_updateSignature",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignatureDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Signatures"
+        ]
+      }
+    },
+    "/autopost": {
+      "get": {
+        "operationId": "AutopostController_getAutoposts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Autopost"
+        ]
+      },
+      "post": {
+        "operationId": "AutopostController_createAutopost",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutopostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Autopost"
+        ]
+      }
+    },
+    "/autopost/{id}": {
+      "put": {
+        "operationId": "AutopostController_updateAutopost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutopostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Autopost"
+        ]
+      },
+      "delete": {
+        "operationId": "AutopostController_deleteAutopost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Autopost"
+        ]
+      }
+    },
+    "/autopost/{id}/active": {
+      "post": {
+        "operationId": "AutopostController_changeActive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Autopost"
+        ]
+      }
+    },
+    "/autopost/send": {
+      "post": {
+        "operationId": "AutopostController_sendWebhook",
+        "parameters": [
+          {
+            "name": "url",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Autopost"
+        ]
+      }
+    },
+    "/sets": {
+      "get": {
+        "operationId": "SetsController_getSets",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sets"
+        ]
+      },
+      "post": {
+        "operationId": "SetsController_createASet",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sets"
+        ]
+      },
+      "put": {
+        "operationId": "SetsController_updateSet",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSetsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sets"
+        ]
+      }
+    },
+    "/sets/{id}": {
+      "delete": {
+        "operationId": "SetsController_deleteSet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sets"
+        ]
+      }
+    },
+    "/third-party/list": {
+      "get": {
+        "operationId": "ThirdPartyController_getThirdPartyList",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Third Party"
+        ]
+      }
+    },
+    "/third-party": {
+      "get": {
+        "operationId": "ThirdPartyController_getSavedThirdParty",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Third Party"
+        ]
+      }
+    },
+    "/third-party/{id}": {
+      "delete": {
+        "operationId": "ThirdPartyController_deleteById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Third Party"
+        ]
+      }
+    },
+    "/third-party/{id}/submit": {
+      "post": {
+        "operationId": "ThirdPartyController_generate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Third Party"
+        ]
+      }
+    },
+    "/third-party/function/{id}/{functionName}": {
+      "post": {
+        "operationId": "ThirdPartyController_callFunction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "functionName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Third Party"
+        ]
+      }
+    },
+    "/third-party/{identifier}": {
+      "post": {
+        "operationId": "ThirdPartyController_addApiKey",
+        "parameters": [
+          {
+            "name": "identifier",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Third Party"
+        ]
+      }
+    },
+    "/dashboard/summary": {
+      "get": {
+        "operationId": "DashboardController_getSummary",
+        "parameters": [
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "reddit",
+                  "linkedin",
+                  "linkedin-page",
+                  "instagram",
+                  "instagram-standalone",
+                  "facebook",
+                  "youtube",
+                  "tiktok",
+                  "pinterest",
+                  "threads",
+                  "mastodon",
+                  "bluesky",
+                  "medium",
+                  "devto",
+                  "hashnode",
+                  "wordpress",
+                  "discord",
+                  "slack",
+                  "telegram",
+                  "dribbble",
+                  "kick",
+                  "twitch",
+                  "lemmy",
+                  "listmonk",
+                  "gmb",
+                  "wrapcast",
+                  "nostr",
+                  "vk"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns dashboard summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/posts-trend": {
+      "get": {
+        "operationId": "DashboardController_getPostsTrend",
+        "parameters": [
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "daily",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns posts trend",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/traffics": {
+      "get": {
+        "operationId": "DashboardController_getTraffics",
+        "parameters": [
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "reddit",
+                  "linkedin",
+                  "linkedin-page",
+                  "instagram",
+                  "instagram-standalone",
+                  "facebook",
+                  "youtube",
+                  "tiktok",
+                  "pinterest",
+                  "threads",
+                  "mastodon",
+                  "bluesky",
+                  "medium",
+                  "devto",
+                  "hashnode",
+                  "wordpress",
+                  "discord",
+                  "slack",
+                  "telegram",
+                  "dribbble",
+                  "kick",
+                  "twitch",
+                  "lemmy",
+                  "listmonk",
+                  "gmb",
+                  "wrapcast",
+                  "nostr",
+                  "vk"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns traffic analytics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/impressions": {
+      "get": {
+        "operationId": "DashboardController_getImpressions",
+        "parameters": [
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "daily",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "reddit",
+                  "linkedin",
+                  "linkedin-page",
+                  "instagram",
+                  "instagram-standalone",
+                  "facebook",
+                  "youtube",
+                  "tiktok",
+                  "pinterest",
+                  "threads",
+                  "mastodon",
+                  "bluesky",
+                  "medium",
+                  "devto",
+                  "hashnode",
+                  "wordpress",
+                  "discord",
+                  "slack",
+                  "telegram",
+                  "dribbble",
+                  "kick",
+                  "twitch",
+                  "lemmy",
+                  "listmonk",
+                  "gmb",
+                  "wrapcast",
+                  "nostr",
+                  "vk"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns impressions analytics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/post-engagement": {
+      "get": {
+        "operationId": "DashboardController_getPostEngagement",
+        "parameters": [
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns post engagement analytics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/public/v1/upload": {
+      "post": {
+        "operationId": "PublicIntegrationsController_uploadSimple",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/upload-from-url": {
+      "post": {
+        "operationId": "PublicIntegrationsController_uploadsFromUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/find-slot/{id}": {
+      "get": {
+        "operationId": "PublicIntegrationsController_findSlotIntegration",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/posts": {
+      "get": {
+        "operationId": "PublicIntegrationsController_getPosts",
+        "parameters": [
+          {
+            "name": "startDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "display",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "QUEUE",
+                "PUBLISHED",
+                "ERROR",
+                "DRAFT"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "reddit",
+                  "linkedin",
+                  "linkedin-page",
+                  "instagram",
+                  "instagram-standalone",
+                  "facebook",
+                  "youtube",
+                  "tiktok",
+                  "pinterest",
+                  "threads",
+                  "mastodon",
+                  "bluesky",
+                  "medium",
+                  "devto",
+                  "hashnode",
+                  "wordpress",
+                  "discord",
+                  "slack",
+                  "telegram",
+                  "dribbble",
+                  "kick",
+                  "twitch",
+                  "lemmy",
+                  "listmonk",
+                  "gmb",
+                  "wrapcast",
+                  "nostr",
+                  "vk"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      },
+      "post": {
+        "operationId": "PublicIntegrationsController_createPost",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/posts/{id}": {
+      "delete": {
+        "operationId": "PublicIntegrationsController_deletePost",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/is-connected": {
+      "get": {
+        "operationId": "PublicIntegrationsController_getActiveIntegrations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/integrations": {
+      "get": {
+        "operationId": "PublicIntegrationsController_listIntegration",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/generate-video": {
+      "post": {
+        "operationId": "PublicIntegrationsController_generateVideo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/public/v1/video/function": {
+      "post": {
+        "operationId": "PublicIntegrationsController_videoFunction",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoFunctionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Public API"
+        ]
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "operationId": "AdminSettingsController_listSettings",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminSettingsController_createSetting",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSettingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/settings/{key}": {
+      "get": {
+        "operationId": "AdminSettingsController_getSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      },
+      "put": {
+        "operationId": "AdminSettingsController_updateSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminSettingsController_deleteSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/ai-pricing": {
+      "get": {
+        "operationId": "AdminSettingsController_getAiPricing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminSettingsController_createAiPricing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAiPricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      },
+      "put": {
+        "operationId": "AdminSettingsController_updateAiPricing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAiPricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/organizations": {
+      "get": {
+        "operationId": "AdminOrganizationsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/organizations/{id}": {
+      "get": {
+        "operationId": "AdminOrganizationsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/posts": {
+      "get": {
+        "operationId": "AdminPostsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "x",
+                "reddit",
+                "linkedin",
+                "linkedin-page",
+                "instagram",
+                "instagram-standalone",
+                "facebook",
+                "youtube",
+                "tiktok",
+                "pinterest",
+                "threads",
+                "mastodon",
+                "bluesky",
+                "medium",
+                "devto",
+                "hashnode",
+                "wordpress",
+                "discord",
+                "slack",
+                "telegram",
+                "dribbble",
+                "kick",
+                "twitch",
+                "lemmy",
+                "listmonk",
+                "gmb",
+                "wrapcast",
+                "nostr",
+                "vk"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "publishDate",
+              "enum": [
+                "publishDate",
+                "createdAt",
+                "updatedAt",
+                "state"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/posts/{id}": {
+      "get": {
+        "operationId": "AdminPostsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/integrations": {
+      "get": {
+        "operationId": "AdminIntegrationsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerIdentifier",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "disabled",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "refreshNeeded",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "updatedAt",
+                "name",
+                "providerIdentifier"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/integrations/{id}": {
+      "get": {
+        "operationId": "AdminIntegrationsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/errors": {
+      "get": {
+        "operationId": "AdminErrorsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "platform"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/errors/{id}": {
+      "get": {
+        "operationId": "AdminErrorsController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/media": {
+      "get": {
+        "operationId": "AdminMediaController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "name",
+                "fileSize"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/dashboard": {
+      "get": {
+        "operationId": "AdminDashboardController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/dashboard/data-ticks/backfill": {
+      "post": {
+        "operationId": "AdminDashboardController_backfillDataTicks",
+        "summary": "",
+        "description": "Backfill DataTicks for a specific date or date range.\nUsage: POST /admin/dashboard/data-ticks/backfill?startDate=2026-03-01&endDate=2026-03-10",
+        "parameters": [
+          {
+            "name": "startDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/dashboard/user/summary": {
+      "get": {
+        "operationId": "AdminDashboardController_getUserDashboardSummary",
+        "summary": "",
+        "description": "GET /admin/dashboard/user/summary\n\nAdmin version of /dashboard/summary for a specific user or organization.\nQuery params:\n  - organizationId or userId (at least one required)\n  - startDate, endDate, integrationId, channel, tz (same as /dashboard/summary)",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "x",
+                "reddit",
+                "linkedin",
+                "linkedin-page",
+                "instagram",
+                "instagram-standalone",
+                "facebook",
+                "youtube",
+                "tiktok",
+                "pinterest",
+                "threads",
+                "mastodon",
+                "bluesky",
+                "medium",
+                "devto",
+                "hashnode",
+                "wordpress",
+                "discord",
+                "slack",
+                "telegram",
+                "dribbble",
+                "kick",
+                "twitch",
+                "lemmy",
+                "listmonk",
+                "gmb",
+                "wrapcast",
+                "nostr",
+                "vk"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "tz",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/dashboard/account-metrics/{integrationId}": {
+      "post": {
+        "operationId": "AdminDashboardController_syncAccountMetrics",
+        "summary": "",
+        "description": "POST /admin/dashboard/account-metrics/:integrationId\n\nTrigger account-level metrics sync for a single integration.\nReturns the fetched metrics or null if the provider doesn't support it.",
+        "parameters": [
+          {
+            "name": "integrationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/recurring-posts": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkRecurringPosts",
+        "summary": "",
+        "description": "GET /admin/diagnostics/recurring-posts\n\nChecks for anomalies in recurring post data:\n1. Premature clones: published before their publishDate\n2. Duplicate clones: multiple PUBLISHED clones for the same day\n3. Missed cycles: expected publishDate passed with no clone",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/stuck-posts": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkStuckPosts",
+        "summary": "",
+        "description": "GET /admin/diagnostics/stuck-posts\n\nFinds non-recurring posts stuck in QUEUE past their publishDate (>2h).\nThese should have been picked up by missingPostWorkflow but weren't.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/integrations": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkIntegrations",
+        "summary": "",
+        "description": "GET /admin/diagnostics/integrations\n\nFinds integrations with health issues:\n1. refreshNeeded: token expired, needs reconnection\n2. inBetweenSteps: stuck in OAuth flow\n3. disabled: manually disabled\nAlso counts QUEUE posts per unhealthy integration (posts that can't publish).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/error-posts": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkErrorPosts",
+        "summary": "",
+        "description": "GET /admin/diagnostics/error-posts\n\nFinds recent ERROR posts (last 7 days) with their error details.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/overview": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_overview",
+        "summary": "",
+        "description": "GET /admin/diagnostics/overview\n\nAggregated health check across all diagnostics.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/billing/records": {
+      "get": {
+        "operationId": "AdminBillingController_listRecords",
+        "summary": "",
+        "description": "GET /admin/billing/records\n\nList billing records with optional filters.\nQuery params:\n  - status: pending | success | failed | skipped (default: all)\n  - organizationId: filter by org\n  - businessType: ai_copywriting | image_gen | video_gen\n  - page: page number (default: 1)\n  - pageSize: items per page (default: 50, max: 200)",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "businessType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/billing/records/{id}": {
+      "get": {
+        "operationId": "AdminBillingController_getRecord",
+        "summary": "",
+        "description": "GET /admin/billing/records/:id\n\nGet a single billing record by ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/billing/summary": {
+      "get": {
+        "operationId": "AdminBillingController_summary",
+        "summary": "",
+        "description": "GET /admin/billing/summary\n\nAggregated billing summary: counts and totals by status and businessType.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/billing/associate/{taskId}": {
+      "patch": {
+        "operationId": "AdminBillingController_associateEntity",
+        "summary": "",
+        "description": "PATCH /admin/billing/associate/:taskId\n\nBack-fill a BillingRecord with a business entity created after billing.\nUsed when Post / Media is created after the AI generation.",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/billing/retry/{id}": {
+      "post": {
+        "operationId": "AdminBillingController_retryRecord",
+        "summary": "",
+        "description": "POST /admin/billing/retry/:id\n\nRetry a single failed billing record.\nRe-sends the deduction to Aisee and updates the local record.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/billing/retry-all-failed": {
+      "post": {
+        "operationId": "AdminBillingController_retryAllFailed",
+        "summary": "",
+        "description": "POST /admin/billing/retry-all-failed\n\nRetry all failed billing records. Returns a summary of results.\nProcesses sequentially to avoid overwhelming Aisee.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Postiz Swagger file",
+    "description": "API description",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "JWT-auth": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "Enter your JWT token"
+      }
+    },
+    "schemas": {
+      "CreateOrgUserDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64
+          },
+          "provider": {
+            "type": "object"
+          },
+          "providerToken": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "password",
+          "provider",
+          "providerToken",
+          "email",
+          "company"
+        ]
+      },
+      "LoginUserDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 3
+          },
+          "provider": {
+            "type": "object"
+          },
+          "providerToken": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "password",
+          "provider",
+          "providerToken",
+          "email"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ForgotReturnPasswordDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 3
+          },
+          "repeatPassword": {
+            "type": "string",
+            "enum": [
+              "te1ShIB6Hq"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "minLength": 5
+          }
+        },
+        "required": [
+          "password",
+          "repeatPassword",
+          "token"
+        ]
+      },
+      "ResendActivationDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "CreateInternalUserDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "MediaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "thumbnail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path"
+        ]
+      },
+      "UserDetailDto": {
+        "type": "object",
+        "properties": {
+          "fullname": {
+            "type": "string",
+            "minLength": 3
+          },
+          "bio": {
+            "type": "string"
+          },
+          "picture": {
+            "$ref": "#/components/schemas/MediaDto"
+          }
+        },
+        "required": [
+          "fullname",
+          "bio",
+          "picture"
+        ]
+      },
+      "EmailNotificationsDto": {
+        "type": "object",
+        "properties": {
+          "sendSuccessEmails": {
+            "type": "boolean"
+          },
+          "sendFailureEmails": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sendSuccessEmails",
+          "sendFailureEmails"
+        ]
+      },
+      "IntegrationFunctionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "id",
+          "data"
+        ]
+      },
+      "ConnectIntegrationDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "refresh": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "code",
+          "timezone"
+        ]
+      },
+      "FieldsDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      },
+      "PlugDto": {
+        "type": "object",
+        "properties": {
+          "func": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldsDto"
+            }
+          }
+        },
+        "required": [
+          "func",
+          "fields"
+        ]
+      },
+      "AddTeamMemberDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "sendEmail": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "role",
+          "sendEmail"
+        ]
+      },
+      "ShortlinkPreferenceDto": {
+        "type": "object",
+        "properties": {
+          "shortlink": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "shortlink"
+        ]
+      },
+      "CreateTagDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "color"
+        ]
+      },
+      "Tags": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ]
+      },
+      "Integration": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "PostContent": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "delay": {
+            "type": "number"
+          },
+          "image": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaDto"
+            }
+          }
+        },
+        "required": [
+          "content",
+          "id",
+          "delay",
+          "image"
+        ]
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "integration": {
+            "$ref": "#/components/schemas/Integration"
+          },
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostContent"
+            }
+          },
+          "group": {
+            "type": "string"
+          },
+          "settings": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "integration",
+          "value",
+          "group",
+          "settings"
+        ]
+      },
+      "CreatePostDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "schedule",
+              "now"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "calendar",
+              "chat"
+            ]
+          },
+          "order": {
+            "type": "string"
+          },
+          "shortLink": {
+            "type": "boolean"
+          },
+          "inter": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tags"
+            }
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Post"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "shortLink",
+          "date",
+          "tags",
+          "posts"
+        ]
+      },
+      "InnerPost": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "post"
+        ]
+      },
+      "PostGroup": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InnerPost"
+            }
+          }
+        },
+        "required": [
+          "list"
+        ]
+      },
+      "CreateGeneratedPostsDto": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostGroup"
+            }
+          },
+          "week": {
+            "type": "number"
+          },
+          "year": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string"
+          },
+          "postId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "posts",
+          "week",
+          "year",
+          "url",
+          "postId"
+        ]
+      },
+      "GeneratorDto": {
+        "type": "object",
+        "properties": {
+          "research": {
+            "type": "string",
+            "minLength": 10
+          },
+          "isPicture": {
+            "type": "boolean"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "one_short",
+              "one_long",
+              "thread_short",
+              "thread_long"
+            ]
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "company"
+            ]
+          }
+        },
+        "required": [
+          "research",
+          "isPicture",
+          "format",
+          "tone"
+        ]
+      },
+      "VideoDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string",
+            "enum": [
+              "vertical",
+              "horizontal"
+            ]
+          },
+          "customParams": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "type",
+          "output",
+          "customParams"
+        ]
+      },
+      "SaveMediaInformationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "thumbnail": {
+            "type": "string"
+          },
+          "thumbnailTimestamp": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "alt",
+          "thumbnail",
+          "thumbnailTimestamp"
+        ]
+      },
+      "VideoFunctionDto": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string"
+          },
+          "functionName": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "identifier",
+          "functionName",
+          "params"
+        ]
+      },
+      "BillingSubscribeDto": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "MONTHLY",
+              "YEARLY"
+            ]
+          },
+          "billing": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "PRO",
+              "TEAM",
+              "ULTIMATE"
+            ]
+          },
+          "utm": {
+            "type": "string"
+          },
+          "dub": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "period",
+          "billing",
+          "utm",
+          "dub"
+        ]
+      },
+      "WebhooksIntegrationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "WebhooksDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "integrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebhooksIntegrationDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "integrations"
+        ]
+      },
+      "UpdateDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "integrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebhooksIntegrationDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "integrations"
+        ]
+      },
+      "SignatureDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "autoAdd": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "content",
+          "autoAdd"
+        ]
+      },
+      "Integrations": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "AutopostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "lastUrl": {
+            "type": "string"
+          },
+          "onSlot": {
+            "type": "boolean"
+          },
+          "syncLast": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "addPicture": {
+            "type": "boolean"
+          },
+          "generateContent": {
+            "type": "boolean"
+          },
+          "integrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Integrations"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "content",
+          "lastUrl",
+          "onSlot",
+          "syncLast",
+          "url",
+          "active",
+          "addPicture",
+          "generateContent",
+          "integrations"
+        ]
+      },
+      "SetsDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "content"
+        ]
+      },
+      "UpdateSetsDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "content"
+        ]
+      },
+      "UploadDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "CreateSettingDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "object"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ]
+      },
+      "UpdateSettingDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "object"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "AiPricingEntryDto": {
+        "type": "object",
+        "properties": {
+          "servicer": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "billing_mode": {
+            "type": "string",
+            "enum": [
+              "per_token",
+              "per_image"
+            ]
+          },
+          "price": {
+            "type": "string",
+            "pattern": "PRICE_PATTERN"
+          },
+          "input_price": {
+            "type": "string",
+            "pattern": "PRICE_PATTERN"
+          },
+          "output_price": {
+            "type": "string",
+            "pattern": "PRICE_PATTERN"
+          }
+        },
+        "required": [
+          "servicer",
+          "provider",
+          "model",
+          "billing_mode",
+          "price"
+        ]
+      },
+      "UpdateAiPricingDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "$ref": "#/components/schemas/AiPricingEntryDto"
+          },
+          "image": {
+            "$ref": "#/components/schemas/AiPricingEntryDto"
+          }
+        },
+        "required": [
+          "text",
+          "image"
+        ]
+      },
+      "GetPostsDto": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ]
+          },
+          "customer": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUE",
+              "PUBLISHED",
+              "ERROR",
+              "DRAFT"
+            ]
+          },
+          "integrationId": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "channel": {
+            "type": "array",
+            "enum": [
+              "x",
+              "reddit",
+              "linkedin",
+              "linkedin-page",
+              "instagram",
+              "instagram-standalone",
+              "facebook",
+              "youtube",
+              "tiktok",
+              "pinterest",
+              "threads",
+              "mastodon",
+              "bluesky",
+              "medium",
+              "devto",
+              "hashnode",
+              "wordpress",
+              "discord",
+              "slack",
+              "telegram",
+              "dribbble",
+              "kick",
+              "twitch",
+              "lemmy",
+              "listmonk",
+              "gmb",
+              "wrapcast",
+              "nostr",
+              "vk"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "x",
+                "reddit",
+                "linkedin",
+                "linkedin-page",
+                "instagram",
+                "instagram-standalone",
+                "facebook",
+                "youtube",
+                "tiktok",
+                "pinterest",
+                "threads",
+                "mastodon",
+                "bluesky",
+                "medium",
+                "devto",
+                "hashnode",
+                "wordpress",
+                "discord",
+                "slack",
+                "telegram",
+                "dribbble",
+                "kick",
+                "twitch",
+                "lemmy",
+                "listmonk",
+                "gmb",
+                "wrapcast",
+                "nostr",
+                "vk"
+              ]
+            }
+          }
+        },
+        "required": [
+          "startDate",
+          "endDate"
+        ]
+      },
+      "GetPostsListDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUE",
+              "PUBLISHED",
+              "ERROR",
+              "DRAFT"
+            ]
+          },
+          "integrationId": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "channel": {
+            "type": "array",
+            "enum": [
+              "x",
+              "reddit",
+              "linkedin",
+              "linkedin-page",
+              "instagram",
+              "instagram-standalone",
+              "facebook",
+              "youtube",
+              "tiktok",
+              "pinterest",
+              "threads",
+              "mastodon",
+              "bluesky",
+              "medium",
+              "devto",
+              "hashnode",
+              "wordpress",
+              "discord",
+              "slack",
+              "telegram",
+              "dribbble",
+              "kick",
+              "twitch",
+              "lemmy",
+              "listmonk",
+              "gmb",
+              "wrapcast",
+              "nostr",
+              "vk"
+            ],
+            "description": "Filter by provider type (e.g. x, reddit, linkedin)",
+            "items": {
+              "type": "string",
+              "enum": [
+                "x",
+                "reddit",
+                "linkedin",
+                "linkedin-page",
+                "instagram",
+                "instagram-standalone",
+                "facebook",
+                "youtube",
+                "tiktok",
+                "pinterest",
+                "threads",
+                "mastodon",
+                "bluesky",
+                "medium",
+                "devto",
+                "hashnode",
+                "wordpress",
+                "discord",
+                "slack",
+                "telegram",
+                "dribbble",
+                "kick",
+                "twitch",
+                "lemmy",
+                "listmonk",
+                "gmb",
+                "wrapcast",
+                "nostr",
+                "vk"
+              ]
+            }
+          },
+          "sourcePostId": {
+            "type": "string"
+          },
+          "view": {
+            "type": "string",
+            "default": "timeline",
+            "enum": [
+              "templates",
+              "timeline"
+            ]
+          },
+          "sortBy": {
+            "type": "string",
+            "default": "publishDate",
+            "enum": [
+              "publishDate",
+              "createdAt",
+              "updatedAt",
+              "state"
+            ]
+          },
+          "sortOrder": {
+            "type": "string",
+            "default": "desc",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "JWT-auth": []
+    }
+  ]
+}

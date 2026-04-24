@@ -39,7 +39,6 @@ Interact with the AISee Orchestrator to scan and audit websites.
 Trigger a comprehensive site audit.
 - **Flags:**
   - `--platform <names>`: Specify AI platforms (e.g., `anthropic,google`).
-  - `--rescan`: Force a fresh analysis even if a recent one exists.
 
 ### `aisee report <url> [section]`
 View the analysis report for a specific URL.

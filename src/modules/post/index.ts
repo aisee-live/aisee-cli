@@ -28,7 +28,6 @@ export const postCreateModule = {
       throw new Error("Either 'text' or 'file' must be provided.");
     }
 
-    // According to postiz-app controller, it maps raw body to post type
     return await postAgentClient.createPost({
       text: content,
       channels: [input.channel],
@@ -41,10 +40,7 @@ export const postCreateModule = {
 export const postListModule = {
   description: "Retrieve a list of social media posts with filtering",
   inputSchema: z.object({
-    startDate: z.string().optional().describe("Start date for filtering (YYYY-MM-DD)"),
-    endDate: z.string().optional().describe("End date for filtering (YYYY-MM-DD)"),
     state: z.enum(["DRAFT", "QUEUE", "PUBLISHED", "ERROR"]).optional().describe("Filter posts by their current state"),
-    channel: z.string().optional().describe("Filter posts by channel ID"),
     limit: z.number().int().min(1).max(100).default(10).describe("Number of items per page")
   }),
   outputSchema: z.object({
@@ -52,16 +48,9 @@ export const postListModule = {
     total: z.number().describe("Total count matching filters")
   }),
   async execute(input: any) {
-    // Set default dates if not provided (default to last 30 days)
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
     const params = {
-      startDate: input.startDate || thirtyDaysAgo.toISOString().split('T')[0],
-      endDate: input.endDate || now.toISOString().split('T')[0],
       state: input.state,
-      channel: input.channel,
-      limit: input.limit
+      pageSize: input.limit
     };
 
     return await postAgentClient.listPosts(params);
@@ -95,7 +84,6 @@ export const channelAddModule = {
     message: z.string()
   }),
   async execute(input: any) {
-    // Redirects to the hosted OAuth flow
     const url = `https://app.aisee.ai/channels/add/${input.platform}`;
     await open(url);
     return { message: `Opening browser to authorize ${input.platform} connection...` };

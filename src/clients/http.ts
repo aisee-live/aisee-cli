@@ -17,7 +17,7 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
-  const instance = axios.create();
+  const instance = axios.create({ timeout: 30000 });
 
   instance.interceptors.request.use(async (config) => {
     const settings = await loadSettings();
@@ -40,6 +40,7 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
+            setTimeout(() => reject(new Error("Token refresh timeout")), 30000);
           })
             .then(token => {
               originalRequest.headers.Authorization = `Bearer ${token}`;

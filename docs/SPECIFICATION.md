@@ -1,129 +1,322 @@
-# AISEE CLI - Software Specification
+# AISee CLI — Technical Specification
 
 **Version:** 1.0.0  
-**Status:** Draft  
-**Owner:** AISee Engineering  
-**Language:** English
+**Status:** Current  
+**Owner:** AISee Engineering
 
 ---
 
-## 1. Introduction
-AISEE CLI is a high-performance command-line interface designed to bridge the gap between AI-driven SEO analysis (AISee Orchestrator) and multi-channel content distribution (Postiz). It serves as a professional tool for marketers and developers to automate AEO (Answer Engine Optimization) workflows directly from their terminal.
+## 1. Overview
+
+AISee CLI is a compiled, single-binary CLI that bridges two backend services:
+
+- **AISee Orchestrator** (`api.aisee.live`) — AEO analysis, scoring, and action recommendations.
+- **Post Agent** (`api-post.aisee.live`) — Social media post creation, scheduling, and channel management.
+
+The CLI is thin by design: business logic lives in the backends. The CLI handles authentication, input collection, and output formatting.
+
+---
 
 ## 2. Design Principles
-- **Thin Client Philosophy:** The CLI should remain lightweight, delegating complex logic to the `aisee-orchestrator`.
-- **Developer First:** Prioritize speed, clear error messages, and piping support (JSON output).
-- **Secure by Default:** Use standard OAuth2/OIDC flows; never store passwords locally.
-- **Convention over Configuration:** Sensible defaults for all commands, but fully customizable via YAML.
 
-## 3. Technical Architecture
+- **Thin client** — delegate complex logic to the orchestrator; keep the CLI fast and predictable.
+- **Standard UX** — primary operands are positional args; secondary controls are `--flags`. Follows GNU/POSIX conventions.
+- **Structured output everywhere** — every command supports `--format json|table|csv|yaml|jsonl` and `--fields` selection.
+- **Secure by default** — OAuth 2.0 Device Flow only; credentials stored in a local file, never in env vars or shell history.
+- **Observable** — `--dry-run`, `--trace`, `--log-level DEBUG` available on every command via apcore-cli.
+
+---
+
+## 3. Architecture
+
 ### 3.1 Stack
-- **Runtime:** [Bun](https://bun.sh) (Selected for its speed and built-in SQLite/HTTP support).
-- **Language:** TypeScript (Strict typing for robust command definitions).
-- **Framework:** 
-  - `apcore-typescript`: Core registry and module patterns.
-  - `apcore-cli-typescript`: Command parsing and CLI layout.
-  - `apcore-toolkit-typescript`: Shared utilities for logging and I/O.
-- **Formatting/Validation:** `Zod` for runtime input validation, `YAML` for configuration.
 
-### 3.2 System Components
-- **CLI Core:** Handles routing, registry management, and global error handling.
-- **Service Clients:**
-  - `AnalysisClient`: Communicates with `aisee-orchestrator`.
-  - `PostClient`: Communicates with `post-agent` (Postiz-app).
-- **Storage:** Local configuration at `~/.config/aisee/config.yaml`.
+| Layer | Technology |
+|---|---|
+| Runtime (build) | Bun ≥ 1.0 |
+| Runtime (run) | Standalone binary — no Bun/Node required after install |
+| Language | TypeScript (strict mode) |
+| Core SDK | `apcore-js` ≥ 0.19.0 |
+| CLI SDK | `apcore-cli` 0.7.0 |
+| Toolkit | `apcore-toolkit` ≥ 0.5.0 (optional peer) |
+| Schema | Zod v3 (input validation) |
+| HTTP | Axios (with token refresh interceptor) |
+
+### 3.2 Module System
+
+Every command is an apcore module registered in a `Registry`. On startup:
+
+```
+Registry.register("scan", scanModule)
+Registry.register("auth.login", loginModule)
+...
+```
+
+The `APCore` unified client wraps the registry and executor. Three adapter classes bridge
+the apcore-js and apcore-cli interface contracts:
+
+| Adapter | Bridges |
+|---|---|
+| `ExecutorAdapter` | `apcore-js Executor.call()` → `apcore-cli Executor.execute()` |
+| `RegistryAdapter` | `apcore-js Registry.list/getDefinition` → `apcore-cli Registry.listModules/getModule` |
+| `zodToJsonSchema` | Zod v3 input schemas → JSON Schema (required by `buildModuleCommand`) |
+
+### 3.3 CLI Bootstrap
+
+```
+createCli({ registry, executor, progName: "aisee", apcli: false })
+  ↓ sets up: audit logger, approval handler, canonical help, apcli group (hidden)
+  ↓ returns Commander program
+
+buildModuleCommand(descriptor, executor)
+  ↓ generates: --flags from JSON Schema, --dry-run, --trace, --stream, --format, --fields
+
+withPositionals(cmd, ["url", "url"])
+  ↓ preAction hook: maps excess positional argv → named option values
+  ↓ both `cmd <val>` and `cmd --opt <val>` work
+```
+
+### 3.4 Service Clients
+
+| Client | Base URL config key | Purpose |
+|---|---|---|
+| `analysisAxios` | `aisee.analysis_api_url` | Orchestrator — scans, reports, actions |
+| `postAgentAxios` | `aisee.post_agent_api_url` | Post agent — posts, channels, dashboard |
+
+Both instances share a response interceptor that handles automatic token refresh on HTTP 401.
 
 ---
 
 ## 4. Authentication Flow (RFC 8628)
-The CLI implements the **OAuth 2.0 Device Authorization Grant** to provide a seamless login experience without requiring the user to type credentials in the terminal.
 
-### 4.1 Process
-1. **Initiate:** User runs `aisee auth login`.
-2. **Device Code:** CLI requests a device code from the Auth Server.
-3. **User Action:** CLI prints a verification URL and user code. It automatically attempts to open the browser using the `open` package.
-4. **Polling:** The CLI enters a background polling state (with exponential backoff and ora spinner).
-5. **Completion:** Once the user authorizes in the browser, the Auth Server returns an `access_token` and `refresh_token`.
-6. **Persistence:** Tokens are securely stored in the config directory.
+### 4.1 Login sequence
 
-### 4.2 Refresh & Retry
-- **Automatic Refresh:** Before each API call, the CLI checks token expiry. If expired, it uses the `refresh_token` to obtain a new session.
-- **Retry Logic:** Implements transient error retries (3 attempts) for network-related failures.
-
----
-
-## 5. Configuration Schema
-Configuration follows a strict priority hierarchy:
-1. **Command Line Arguments** (highest)
-2. **Environment Variables** (e.g., `AISEE_API_KEY`)
-3. **Config File** (`~/.config/aisee/config.yaml`)
-4. **Internal Defaults** (lowest)
-
-### 5.1 YAML Schema
-```yaml
-# ~/.config/aisee/config.yaml
-auth_api_url: "https://api-auth.aisee.live"
-analysis_api_url: "https://api.aisee.live"
-post_agent_api_url: "https://api-post.aisee.live"
+```
+aisee login
+  │
+  ├─ POST /auth/device/code  → { device_code, user_code, verification_uri, expires_in, interval }
+  │
+  ├─ print verification_uri + user_code to terminal
+  ├─ open(verification_uri_complete)  ← opens browser automatically
+  │
+  ├─ poll POST /auth/token every <interval> seconds (ora spinner)
+  │    ├─ "authorization_pending" → continue polling
+  │    └─ success → { access_token, refresh_token, user }
+  │
+  └─ write ~/.config/aisee/credentials.json
 ```
 
+### 4.2 Token refresh
+
+The `analysisAxios` and `postAgentAxios` response interceptors catch HTTP 401 and:
+
+1. Use `refresh_token` to POST `/auth/token/refresh`.
+2. Update `credentials.json` with the new `access_token`.
+3. Retry the original request.
+
+If refresh fails, credentials are cleared and the user is prompted to run `aisee login`.
+
+### 4.3 Credential storage
+
+```
+~/.config/aisee/
+  credentials.json   ← { userId, email, accessToken, refreshToken, plan, credits }
+  config.yaml        ← service URLs and executor settings
+```
 
 ---
 
-## 6. Command Reference
-The CLI provides 22 logical commands organized into 5 primary modules.
+## 5. Build System
 
-### 6.1 Auth Module
-| Command | Description |
-|---------|-------------|
-| `auth login` | Starts the Device Authorization Flow. |
-| `auth logout` | Revokes and deletes local tokens. |
-| `auth whoami` | Displays current identity and token status. |
+### 5.1 Scripts
 
-### 6.2 Analysis Module (aisee-orchestrator client)
-| Command | Description |
-|---------|-------------|
-| `analysis scan` | Triggers a site-wide scan for AEO/SEO data. |
-| `analysis report` | Fetches the latest comprehensive report. |
-| `analysis report ai-presence` | Shows how AI agents (Perplexity, ChatGPT) perceive the brand. |
-| `analysis report seo` | Standard SEO metrics and health scores. |
-| `analysis report strategy` | High-level strategic recommendations based on AI data. |
-| `analysis report mentions` | Recent brand mentions and competitor positioning. |
-| `analysis actions list` | Lists pending optimization tasks. |
-| `analysis actions suggest` | Requests an AI-generated implementation plan for a task. |
-| `analysis actions post` | Forwards a suggested action to the Postiz draft queue. |
+| Script | Output | Trigger |
+|---|---|---|
+| `prepare` | `./aisee` (current platform) | Automatic on `bun install` |
+| `build:macos-arm64` | `dist/aisee-darwin-arm64` | Manual |
+| `build:macos-x64` | `dist/aisee-darwin-x64` | Manual |
+| `build:linux-x64` | `dist/aisee-linux-x64` | Manual |
+| `build:linux-arm64` | `dist/aisee-linux-arm64` | Manual |
+| `build:windows-x64` | `dist/aisee-windows-x64.exe` | Manual |
+| `build:all` | All five platforms | Manual / CI release |
 
-### 6.3 Post Module (Postiz-app client)
-| Command | Description |
-|---------|-------------|
-| `post create` | Interactive prompt to create a new social media post. |
-| `post list` | Lists recent posts and their status (draft, scheduled, sent). |
-| `post dashboard` | Displays engagement stats and pipeline overview. |
-| `post publish` | Immediately sends a draft to selected channels. |
-| `post schedule` | Schedules a post for a specific future timestamp. |
+`prepare` builds only the local platform binary to keep `bun install` fast. Use `build:all` before cutting a release.
 
-### 6.4 Channels Module
-| Command | Description |
-|---------|-------------|
-| `channels list` | Lists all connected social media integrations. |
-| `channels add` | Guides user to add a new channel (LinkedIn, Twitter, etc.). |
-| `channels remove` | Disconnects a social media channel. |
+### 5.2 npm distribution
 
-### 6.5 Config Module
-| Command | Description |
-|---------|-------------|
-| `config list` | Prints the effective configuration (merged results). |
-| `config set` | Updates a specific key in the YAML config file. |
+The package uses the **platform-optional-package** pattern:
+
+```
+aisee (dispatcher)
+  optionalDependencies:
+    aisee-darwin-arm64   os:darwin  cpu:arm64
+    aisee-darwin-x64     os:darwin  cpu:x64
+    aisee-linux-x64      os:linux   cpu:x64
+    aisee-linux-arm64    os:linux   cpu:arm64
+    aisee-win32-x64      os:win32   cpu:x64
+```
+
+`bin/aisee.js` resolves the binary at runtime:
+1. Optional platform package (`aisee-<os>-<arch>`)
+2. Local `dist/` fallback (dev / monorepo)
+
+See [PUBLISHING.md](./PUBLISHING.md) for the full release checklist.
+
+### 5.3 Installation scripts (from source)
+
+| Script | Platform | Default destination |
+|---|---|---|
+| `scripts/install.sh` | macOS, Linux | `/usr/local/bin/aisee` |
+| `scripts/install.ps1` | Windows | `%LOCALAPPDATA%\Programs\aisee\aisee.exe` + user PATH |
+
+Both scripts auto-build the platform binary from source if `dist/` does not already contain it.
 
 ---
 
-## 7. Error Handling
-- **User Errors (4xx):** Displayed with clear "Actionable" messages in `chalk.yellow`.
-- **System Errors (5xx):** Logged to file, displayed as "Service Unavailable" in `chalk.red`.
-- **Validation Errors:** Zod errors are formatted into a human-readable list of missing/invalid parameters.
+## 6. Configuration
 
-## 8. Development Roadmap
-- [ ] Phase 1: Implementation of `apcore` registry and Auth flow.
-- [ ] Phase 2: Orchestrator integration (`analysis` commands).
-- [ ] Phase 3: Postiz integration (`post` & `channels` commands).
-- [ ] Phase 4: Interactive TUI components for dashboards.
+### 6.1 Priority hierarchy
+
+1. CLI flags (`--log-level`, etc.) — highest
+2. Environment variables (`AISEE_*`, `APCORE_*`)
+3. Config file (`~/.config/aisee/config.yaml`)
+4. Internal defaults — lowest
+
+### 6.2 Config file schema
+
+```yaml
+# ~/.config/aisee/config.yaml
+
+apcore:
+  version: 1.0
+
+executor:
+  default_timeout: 300000   # 5 min — accommodates long-running scans
+  global_timeout: 600000    # 10 min
+
+aisee:
+  auth_api_url:       https://api-auth.aisee.live
+  analysis_api_url:   https://api.aisee.live
+  post_agent_api_url: https://api-post.aisee.live
+  app_url:            https://app.aisee.live
+```
+
+### 6.3 Environment variable overrides
+
+| Env var | Maps to |
+|---|---|
+| `AISEE_AUTH_API_URL` | `aisee.auth_api_url` |
+| `AISEE_ANALYSIS_API_URL` | `aisee.analysis_api_url` |
+| `AISEE_POST_AGENT_API_URL` | `aisee.post_agent_api_url` |
+| `APCORE_CLI_LOGGING_LEVEL` | `--log-level` |
+| `APCORE_CLI_AUTO_APPROVE` | skip approval prompts |
+
+---
+
+## 7. Command Summary
+
+### Top-level
+
+| Command | Description |
+|---|---|
+| `login` | OAuth 2.0 Device Flow login |
+| `logout` | Clear local credentials |
+| `whoami` | Show current user + credit balance |
+| `scan <url>` | Start full AEO analysis |
+| `report <url>` | Fetch analysis report |
+
+### `actions`
+
+| Command | Description |
+|---|---|
+| `actions list <url>` | List optimization tasks |
+| `actions suggest <actionId>` | AI implementation suggestions |
+| `actions post <actionId>` | Convert task to post draft |
+
+### `post`
+
+| Command | Description |
+|---|---|
+| `post create` | Create a new social media post |
+| `post list` | List posts with status filter |
+| `post dashboard` | Engagement and traffic metrics |
+| `post publish <id>` | Publish immediately |
+| `post schedule <id> <time>` | Set scheduled publication time |
+
+### `channels`
+
+| Command | Description |
+|---|---|
+| `channels list` | List connected integrations |
+| `channels add <platform>` | Connect via OAuth |
+| `channels remove <id>` | Disconnect integration |
+
+### `config`
+
+| Command | Description |
+|---|---|
+| `config list` | Show effective configuration |
+| `config set` | Update a config key |
+| `config spec <service>` | Print embedded OpenAPI spec |
+
+---
+
+## 8. Error Handling
+
+Errors are output via `emitErrorTty` (TTY) or `emitErrorJson` (pipe/CI), both from apcore-cli.
+
+**TTY format:**
+```
+Error [MODULE_EXECUTE_ERROR]: Failed to execute module 'scan': <message>
+
+  Details:
+    moduleId: scan
+    reason: <detail>
+
+  Suggestion: <actionable hint>
+  Exit code: 1
+```
+
+**JSON format (when stdout is not a TTY):**
+```json
+{ "error": true, "code": "MODULE_EXECUTE_ERROR", "message": "...", "exit_code": 1 }
+```
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | General error |
+| 2 | Invalid CLI input |
+| 44 | Module dependency not found |
+| 45 | Module not found |
+| 46 | Schema validation error |
+| 47 | ACL denied |
+| 48 | Module execution error |
+| 77 | Approval denied |
+| 130 | SIGINT (Ctrl-C) |
+
+---
+
+## 9. Development
+
+```bash
+# Run from source (no build step)
+bun run start
+
+# Build local binary (also runs automatically on bun install)
+bun run prepare
+
+# Build all platform binaries
+bun run build:all
+
+# Install to /usr/local/bin (macOS/Linux)
+sh scripts/install.sh
+
+# Install on Windows
+.\scripts\install.ps1
+
+# Sync OpenAPI specs from running services
+bun run sync-openapi
+```

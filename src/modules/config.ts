@@ -1,42 +1,52 @@
 import { z } from "zod";
-import { loadSettingsWithSource, saveSettings, Settings } from "../utils/config.ts";
-import chalk from "chalk";
+import { loadSettingsWithSource, saveSettings } from "../utils/config.ts";
+import type { Settings } from "../utils/config.ts";
 
 export const configListModule = {
-  description: "List current configuration and their sources",
+  description: "List current configuration values and their sources",
   inputSchema: z.object({}),
   async execute() {
     const settings = await loadSettingsWithSource();
-    console.log(chalk.bold("\nAISee CLI Configuration:"));
-    
-    Object.entries(settings).forEach(([key, detail]) => {
-      const sourceColor = detail.source === "Config File" ? chalk.green : 
-                         detail.source === "Environment Variable" ? chalk.yellow : chalk.gray;
-      
-      console.log(`${chalk.cyan(key.padEnd(18))}: ${detail.value}`);
-      console.log(`${"".padEnd(18)}  ${sourceColor("(Source: " + detail.source + ")")}`);
-    });
-    
-    return { success: true };
-  }
+    return Object.entries(settings).map(([key, detail]) => ({
+      key,
+      value: detail.value,
+      source: detail.source,
+    }));
+  },
+};
+
+const SETTINGS_KEY_MAP: Record<string, keyof Settings> = {
+  auth_api_url: "authApiUrl",
+  analysis_api_url: "analysisApiUrl",
+  post_agent_api_url: "postAgentApiUrl",
+  app_url: "appUrl",
 };
 
 export const configSetModule = {
-  // ... (existing code)
+  description: "Update a configuration value",
+  inputSchema: z.object({
+    key: z
+      .enum(["auth_api_url", "analysis_api_url", "post_agent_api_url", "app_url"])
+      .describe("Config key to update"),
+    value: z.string().describe("New value for the config key"),
+  }),
+  async execute(input: { key: string; value: string }) {
+    const settingsKey = SETTINGS_KEY_MAP[input.key];
+    if (!settingsKey) throw new Error(`Unknown config key: ${input.key}`);
+    await saveSettings({ [settingsKey]: input.value });
+    return { key: input.key, value: input.value, updated: true };
+  },
 };
 
 export const configSpecModule = {
-  description: "View the embedded OpenAPI specifications for internal services",
+  description: "View the embedded OpenAPI specification for an internal service",
   inputSchema: z.object({
-    service: z.enum(["auth", "analysis", "post-agent"]).describe("Service name to view spec for")
+    service: z
+      .enum(["auth", "analysis", "post-agent"])
+      .describe("Service name to view spec for"),
   }),
-  async execute(input: any) {
+  async execute(input: { service: "auth" | "analysis" | "post-agent" }) {
     const { getEmbeddedSpec } = await import("../schemas/index.ts");
-    const spec = getEmbeddedSpec(input.service);
-    
-    console.log(chalk.bold(`\nEmbedded OpenAPI Spec for: ${input.service}`));
-    console.log(chalk.gray(`Version: ${spec.info?.version || "Unknown"}`));
-    
-    return spec;
-  }
+    return getEmbeddedSpec(input.service);
+  },
 };

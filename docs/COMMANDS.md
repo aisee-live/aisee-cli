@@ -1,126 +1,272 @@
-# AISEE CLI Command Reference
-
-This document provides a detailed guide for all commands available in the AISEE CLI.
+# AISee CLI — Command Reference
 
 ## Global Options
 
-The following flags are available for most commands:
+Available on every command. Built-in apcore options are hidden by default; pass `--verbose` to reveal them.
 
-- `--format <table|json|csv>`: Set the output format (default: `table`).
-- `--quiet`: Suppress non-essential output, returning only raw data.
-- `--help`: Show help information for a command.
-- `--version`: Display the CLI version.
-
----
-
-## 1. Authentication (`auth`)
-
-Manage your identity and session.
-
-### `aisee auth login`
-Initiate the Device Authorization Flow.
-- **Action:** Opens the browser and prompts for a user code.
-- **Output:** Login status and user information.
-
-### `aisee auth logout`
-Clear local credentials and revoke the current session.
-- **Action:** Deletes `~/.config/aisee/credentials.json`.
-
-### `aisee auth whoami`
-Display the currently logged-in user and remaining credits.
+| Flag | Default | Description |
+|---|---|---|
+| `--format <type>` | `table` (TTY) / `json` (pipe) | Output format: `table`, `json`, `csv`, `yaml`, `jsonl` |
+| `--fields <paths>` | — | Comma-separated dot-paths to select from the result, e.g. `status,result.total_score` |
+| `--dry-run` | false | Run preflight checks without executing — shows what would happen |
+| `--trace` | false | Print per-step pipeline timing after the result |
+| `--log-level <level>` | `WARNING` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `--verbose` | false | Show all built-in options in help output |
+| `-V, --version` | — | Print CLI version |
+| `-h, --help` | — | Print help |
 
 ---
 
-## 2. Analysis (`analysis`)
+## Authentication
 
-Interact with the AISee Orchestrator to scan and audit websites.
+### `aisee login`
+Initiate the OAuth 2.0 Device Authorization Flow (RFC 8628).
+
+Opens the browser automatically. Polls for authorization and stores tokens on success.
+
+```bash
+aisee login
+```
+
+### `aisee logout`
+Clear local credentials (`~/.config/aisee/credentials.json`).
+
+```bash
+aisee logout
+```
+
+### `aisee whoami`
+Display the currently authenticated user and credit balance.
+
+```bash
+aisee whoami
+aisee whoami --format json
+```
+
+---
+
+## Analysis
 
 ### `aisee scan <url>`
-Trigger a comprehensive site audit.
-- **Flags:**
-  - `--platform <names>`: Specify AI platforms (e.g., `anthropic,google`).
+Start a full AEO analysis scan for a website.
 
-### `aisee report <url> [section]`
-View the analysis report for a specific URL.
-- **Sections:** `ai-presence`, `competitor`, `strategy`, `seo`, `mentions`.
-- **Flags:**
-  - `--version <v>`: Fetch a specific historical version (e.g., `v2.0`).
-  - `--history`: List all available historical versions for this URL.
+```bash
+aisee scan https://example.com
+aisee scan https://example.com --use-demo          # no credits consumed
+aisee scan https://example.com --format json
+```
 
-### `aisee actions <url>`
-List all actionable optimization tasks recommended for the site.
-- **Flags:**
-  - `--module <name>`: Filter by module (e.g., `strategy`, `competitor`).
+| Flag | Default | Description |
+|---|---|---|
+| `<url>` | required | Website URL to scan |
+| `--task-template-id <id>` | — | Custom task template |
+| `--streaming` | false | Enable streaming HTTP response from analysis API |
+| `--use-demo` | false | Demo mode — no credits consumed |
 
-### `aisee actions suggest <url> <task-id>`
-Get a detailed AI-generated implementation plan for a specific task.
+### `aisee report <url>`
+Retrieve the aggregated analysis report for a URL.
 
-### `aisee actions post <url> <task-id>`
-Convert a task suggestion into a social media post draft.
-- **Flags:**
-  - `--channel <id>`: Target social media channel ID.
+```bash
+aisee report https://example.com
+aisee report https://example.com --section ai-presence
+aisee report https://example.com --history          # list all historical versions
+aisee report https://example.com --version v3.0     # fetch a specific version
+aisee report https://example.com --format json --fields result.total_score
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<url>` | required | Website URL |
+| `--section <name>` | `summary` | `summary`, `ai-presence`, `competitor`, `strategy`, `seo`, `mentions` |
+| `--version <v>` | — | Fetch a specific historical version |
+| `--history` | false | List all available historical versions |
 
 ---
 
-## 3. Post Agent (`post`)
+## Actions
 
-Manage social media content and scheduling.
+### `aisee actions list <url>`
+List actionable optimization tasks for a site.
+
+```bash
+aisee actions list https://example.com
+aisee actions list https://example.com --status pending --size 20
+aisee actions list https://example.com --format json
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<url>` | required | Website URL |
+| `--page <n>` | 1 | Page number |
+| `--size <n>` | 10 | Items per page (max 1000) |
+| `--sort-by <field>` | `position` | Sort field |
+| `--sort-order <asc\|desc>` | `asc` | Sort direction |
+| `--status <s>` | — | Filter by status: `pending`, `in_progress`, `completed` |
+
+### `aisee actions suggest <actionId>`
+Get detailed AI-generated implementation suggestions for an action.
+
+```bash
+aisee actions suggest abc-123
+```
+
+### `aisee actions post <actionId>`
+Convert an action's implementation plan into a social media post draft.
+
+```bash
+aisee actions post abc-123
+aisee actions post abc-123 --channel linkedin-page-id
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<actionId>` | required | Action ID |
+| `--channel <id>` | — | Target channel ID |
+
+---
+
+## Post
 
 ### `aisee post create`
 Create a new social media post.
-- **Flags:**
-  - `--text "content"`: Direct text input.
-  - `--file <path>`: Load content from a Markdown file.
-  - `--channel <id>`: Target channel.
-  - `--schedule <timestamp>`: Set a future publication date.
-  - `--media <path>`: Attach a local image or video.
+
+```bash
+aisee post create --channel x --text "Hello world"
+aisee post create --channel linkedin --file ./draft.md --schedule 2026-05-01T10:00:00Z
+aisee post create --channel instagram --text "Caption" --image ./photo.jpg
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--channel <id>` | required | Channel ID or platform name |
+| `--text <content>` | — | Direct post text |
+| `--file <path>` | — | Path to a Markdown file (alternative to `--text`) |
+| `--schedule <iso>` | — | Scheduled publication time (ISO 8601) |
+| `--image <path>` | — | Local image file to attach |
 
 ### `aisee post list`
-List recent posts and their delivery status.
-- **Flags:**
-  - `--status <scheduled|sent|draft>`: Filter by status.
-  - `--channel <id>`: Filter by channel.
+List recent posts with optional status filter.
+
+```bash
+aisee post list
+aisee post list --state DRAFT --limit 20
+aisee post list --format json
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--state <s>` | — | `DRAFT`, `QUEUE`, `PUBLISHED`, `ERROR` |
+| `--limit <n>` | 10 | Number of posts to return (max 100) |
 
 ### `aisee post dashboard`
-Display social media performance metrics.
-- **Flags:**
-  - `--period <24h|7d|30d>`: Data lookback window.
+View social media engagement and traffic metrics.
+
+```bash
+aisee post dashboard
+aisee post dashboard --period 30d --channel x
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--period <p>` | `7d` | `24h`, `7d`, `30d`, `90d` |
+| `--channel <name>` | — | Filter by platform name |
+
+### `aisee post publish <id>`
+Publish a prepared post immediately.
+
+```bash
+aisee post publish abc-123
+```
+
+### `aisee post schedule <id> <time>`
+Update the scheduled publication time for a post.
+
+```bash
+aisee post schedule abc-123 2026-05-01T10:00:00Z
+```
 
 ---
 
-## 4. Channels (`channels`)
-
-Manage your social media integrations.
+## Channels
 
 ### `aisee channels list`
-List all connected social media accounts.
+List all connected social media accounts and their connection status.
+
+```bash
+aisee channels list
+aisee channels list --format json
+```
 
 ### `aisee channels add <platform>`
-Connect a new social media account.
-- **Action:** Opens the browser for OAuth authorization with the platform.
+Connect a new social media account via browser OAuth.
+
+```bash
+aisee channels add x
+aisee channels add linkedin-page
+```
+
+Supported platforms: `x`, `reddit`, `linkedin`, `linkedin-page`, `instagram`, `facebook`, `youtube`, `tiktok`, `pinterest`, `threads`, `mastodon`, `bluesky`, `medium`, `devto`, `hashnode`
 
 ### `aisee channels remove <id>`
-Disconnect a specific channel.
+Disconnect and remove a social media integration.
+
+```bash
+aisee channels remove abc-123
+```
 
 ---
 
-## 5. Configuration (`config`)
-
-Manage CLI settings and environment URLs.
+## Config
 
 ### `aisee config list`
-List all effective settings and their sources (Config File, Env Var, or Default).
+Show current configuration values and their sources.
 
-### `aisee config set <key> <value>`
-Update a setting in the local `config.yaml`.
-- **Keys:** `authApiUrl`, `analysisApiUrl`, `postAgentApiUrl`.
+```bash
+aisee config list
+aisee config list --format json
+```
+
+### `aisee config set`
+Update a configuration value in `~/.config/aisee/config.yaml`.
+
+```bash
+aisee config set --key analysis_api_url --value https://api.aisee.live
+aisee config set --key auth_api_url     --value https://api-auth.aisee.live
+```
+
+| Key | Description |
+|---|---|
+| `auth_api_url` | Auth service endpoint |
+| `analysis_api_url` | Analysis / orchestrator endpoint |
+| `post_agent_api_url` | Post agent endpoint |
+| `app_url` | Web app URL |
+
+### `aisee config spec <service>`
+Print the embedded OpenAPI specification for an internal service.
+
+```bash
+aisee config spec auth
+aisee config spec analysis
+aisee config spec post-agent
+aisee config spec analysis --format json
+```
 
 ---
 
-## 6. Example Configuration
+## Output Formats
 
-```yaml
-auth_api_url: https://api-auth.aisee.live
-analysis_api_url: https://api.aisee.live
-post_agent_api_url: https://api-post.aisee.live
+All commands that return data support `--format`:
+
+| Format | Use case |
+|---|---|
+| `table` | Human-readable (default in TTY) |
+| `json` | Machine-readable, piping (default when stdout is not a TTY) |
+| `csv` | Spreadsheet export |
+| `yaml` | Config/document output |
+| `jsonl` | Streaming / log ingestion |
+
+Use `--fields` to select specific fields:
+
+```bash
+aisee report https://example.com --format json --fields result.total_score,status
 ```

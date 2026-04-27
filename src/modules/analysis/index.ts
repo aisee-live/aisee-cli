@@ -164,6 +164,7 @@ export const reportModule = {
   outputSchema: z.any(),
   async execute(input: any) {
     const creds = await loadCredentials();
+    const isVerbose = process.argv.includes("--verbose");
 
     if (input.history !== undefined) {
       const raw = await analysisClient.getPostList({
@@ -175,6 +176,8 @@ export const reportModule = {
         if (status === 404) throw notFoundError(input.url);
         throw err;
       });
+
+      if (isVerbose) return raw;
 
       const page = raw as { items?: Record<string, unknown>[]; total?: number; page?: number; size?: number; pages?: number };
       const records: Record<string, unknown>[] = Array.isArray(raw)
@@ -216,6 +219,8 @@ export const reportModule = {
       if (status === 404) throw notFoundError(input.url);
       throw err;
     });
+
+    if (isVerbose) return raw;
 
     if (raw && typeof raw === "object" && "result" in (raw as object)) {
       return summarizeReport(raw as Record<string, unknown>, section);

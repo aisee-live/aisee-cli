@@ -40,17 +40,15 @@ interface AiseeModule {
  *
  * @param mappings  Ordered list of [positionalIndex, optionName] pairs.
  */
-function withPositionals(cmd: Command, ...mappings: [string, string][]): Command {
+function withPositionals(cmd: Command, ...optionNames: string[]): Command {
   cmd.hook("preAction", (thisCmd) => {
-    const excess = thisCmd.args as string[];
-    mappings.forEach(([label, optName], i) => {
-      const val = excess[i];
-      const currentSource = (thisCmd as any).getOptionValueSource?.(optName);
-      const isDefault = currentSource === "default" || currentSource === undefined;
-      if (val && (!thisCmd.getOptionValue(optName) || isDefault)) {
+    optionNames.forEach((optName, i) => {
+      const val = (thisCmd.args as string[])[i];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const source = (thisCmd as any).getOptionValueSource?.(optName);
+      if (val && (!thisCmd.getOptionValue(optName) || source === "default" || source === undefined)) {
         thisCmd.setOptionValue(optName, val);
       }
-      void label;
     });
   });
   return cmd;
@@ -105,9 +103,8 @@ async function main() {
     apcli: false,
   });
 
-  // Override the version listener that createCli inherits from apcore-cli's package.json.
-  // Commander's .version() closes over the version string, so we replace the listener.
-  program.removeAllListeners("option:version");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (program as any).removeAllListeners("option:version");
   program.on("option:version", () => {
     process.stdout.write("1.0.0\n");
     process.exit(0);
@@ -116,11 +113,11 @@ async function main() {
   // Top-level commands  — scan/report take <url> positionally
   program.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("scan", scanModule), executor),
-    ["url", "url"],
+    "url",
   ));
   program.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("report", reportModule), executor),
-    ["url", "url"],
+    "url",
   ));
 
   // auth — promoted to top-level per product spec
@@ -132,15 +129,15 @@ async function main() {
   const actions = program.command("actions").description("Actionable task commands");
   actions.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("actions.list", actionsListModule), executor, 1000, "list"),
-    ["url", "url"],
+    "url",
   ));
   actions.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "suggest"),
-    ["actionId", "actionId"],
+    "actionId",
   ));
   actions.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("actions.post", actionsPostModule), executor, 1000, "post"),
-    ["actionId", "actionId"],
+    "actionId",
   ));
 
   // post — publish takes <id>, schedule takes <id> <time>
@@ -150,12 +147,12 @@ async function main() {
   post.addCommand(buildModuleCommand(makeDescriptor("post.dashboard", postDashboardModule), executor, 1000, "dashboard"));
   post.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("post.publish", postPublishModule), executor, 1000, "publish"),
-    ["id", "id"],
+    "id",
   ));
   post.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("post.schedule", postScheduleModule), executor, 1000, "schedule"),
-    ["id", "id"],
-    ["time", "time"],
+    "id",
+    "time",
   ));
 
   // channels — add takes <platform>, remove takes <id>
@@ -163,11 +160,11 @@ async function main() {
   channels.addCommand(buildModuleCommand(makeDescriptor("channels.list", channelListModule), executor, 1000, "list"));
   channels.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("channels.add", channelAddModule), executor, 1000, "add"),
-    ["platform", "platform"],
+    "platform",
   ));
   channels.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("channels.remove", channelRemoveModule), executor, 1000, "remove"),
-    ["id", "id"],
+    "id",
   ));
 
   // config

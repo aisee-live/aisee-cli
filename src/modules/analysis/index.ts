@@ -72,7 +72,7 @@ function summarizeReport(record: Record<string, unknown>, section = "summary"): 
   const resultObj = record.result as Record<string, unknown> | undefined;
 
   const meta: Record<string, unknown> = {
-    id: typeof record.id === "string" ? record.id.slice(0, 8) : record.id,
+    id: record.id,
     status: record.status,
     version: record.version_name,
     url: record.url,
@@ -119,7 +119,7 @@ function summarizeHistoryRecord(record: Record<string, unknown>): Record<string,
   const totalScore = record.score ?? resultObj?.total_score;
 
   return {
-    id: typeof record.id === "string" ? record.id.slice(0, 8) : record.id,
+    id: record.id,
     code: record.code,
     status: record.status,
     total_score: typeof totalScore === "number" ? totalScore.toFixed(2) : (totalScore ?? "-"),
@@ -229,32 +229,71 @@ export const reportModule = {
   }
 };
 
+function summarizeAction(item: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    id: item.id,
+    sn: item.sn,
+    module: item.source_module,
+    category: item.analysis_cat,
+    title: item.title,
+    difficulty: item.difficulty,
+    impact: item.impact_rating,
+    current_score: item.current_score,
+    expected_score: item.expected_score,
+    status: item.status,
+  };
+  if (item.description) out.description = String(item.description).slice(0, 80);
+  return out;
+}
+
 export const actionsListModule = {
   description: "List actionable optimization tasks",
   inputSchema: z.object({
     url: productUrlSchema.describe("Website URL"),
+    module: z.string().optional().describe("Filter by source module (ai_presence, competitor, strategy)"),
     page: z.number().int().min(1).default(1),
     size: z.number().int().min(1).max(1000).default(10),
     sort_by: z.string().default("position"),
     sort_order: z.enum(["asc", "desc"]).default("asc"),
     status: z.string().optional().describe("Filter by status (pending, in_progress, completed...)")
   }),
-  outputSchema: z.object({
-    items: z.array(z.any()),
-    total: z.number(),
-    page: z.number(),
-    size: z.number(),
-    pages: z.number()
-  }),
+  outputSchema: z.any(),
   async execute(input: any) {
-    return await analysisClient.getActions(input.url, input);
+    const raw = await analysisClient.getActions(input.url, input);
+
+    if (process.argv.includes("--verbose")) return raw;
+
+    const page = raw as { items?: Record<string, unknown>[]; total?: number; page?: number; pages?: number };
+    const items: Record<string, unknown>[] = Array.isArray(page?.items) ? page.items : [];
+    const summaries = items.map(summarizeAction);
+
+    const fmtIdx = process.argv.indexOf("--format");
+    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
+    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
+
+    if (effectiveFmt === "csv") return summaries;
+
+    const pagination = {
+      total: page.total ?? summaries.length,
+      page: page.page ?? 1,
+      pages: page.pages ?? 1,
+    };
+
+    if (effectiveFmt === "table") {
+      const header = `total: ${pagination.total}  page: ${pagination.page}  pages: ${pagination.pages}`;
+      const tables = summaries.map(s => formatKeyValueTable(s)).join("\n\n");
+      return `${header}\n\n${tables}`;
+    }
+
+    return { ...pagination, items: summaries };
   }
 };
 
 export const actionsSuggestModule = {
   description: "Get detailed AI implementation suggestions",
   inputSchema: z.object({
-    actionId: z.string().describe("Action ID to generate tasks for"),
+    url: productUrlSchema.describe("Website URL"),
+    actionId: z.string().describe("Action task ID"),
   }),
   outputSchema: z.any(),
   async execute(input: any) {

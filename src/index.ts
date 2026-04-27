@@ -125,19 +125,16 @@ async function main() {
   program.addCommand(buildModuleCommand(makeDescriptor("auth.logout", logoutModule), executor, 1000, "logout"));
   program.addCommand(buildModuleCommand(makeDescriptor("auth.whoami", whoamiModule), executor, 1000, "whoami"));
 
-  // actions — list/suggest/post take <url> first
-  const actions = program.command("actions").description("Actionable task commands");
-  actions.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("actions.list", actionsListModule), executor, 1000, "list"),
+  // actions <url> — standalone list command, no subcommands
+  program.addCommand(withPositionals(
+    buildModuleCommand(makeDescriptor("actions.list", actionsListModule), executor, 1000, "actions"),
     "url",
   ));
-  actions.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "suggest"),
-    "actionId",
-  ));
-  actions.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("actions.post", actionsPostModule), executor, 1000, "post"),
-    "actionId",
+
+  // action-suggest <url> <task-id> — top-level to avoid argv[2] ambiguity with subcommand names
+  program.addCommand(withPositionals(
+    buildModuleCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "action-suggest"),
+    "url", "actionId",
   ));
 
   // post — publish takes <id>, schedule takes <id> <time>

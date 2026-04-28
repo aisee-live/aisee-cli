@@ -24,10 +24,18 @@ export interface TokenResponse {
 export const authClient = {
   async requestDeviceCode(clientId: string = "aisee-cli"): Promise<DeviceCodeResponse> {
     const { authApiUrl } = await loadSettings();
-    const response = await axios.post(`${authApiUrl}/cli/auth/device-code`, {
-      client_id: clientId
-    });
-    return response.data;
+    const url = `${authApiUrl}/cli/auth/device-code`;
+    try {
+      const response = await axios.post(url, { client_id: clientId });
+      return response.data;
+    } catch (error: any) {
+      // Retry once: TLS session cache may not be warm on first cold connection
+      if (error.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" || error.code === "CERT_UNTRUSTED" || error.message?.includes("certificate")) {
+        const response = await axios.post(url, { client_id: clientId });
+        return response.data;
+      }
+      throw error;
+    }
   },
 
   async pollToken(deviceCode: string): Promise<TokenResponse | "pending"> {

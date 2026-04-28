@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "start": "bun run src/index.ts",
+    "build": "bun build ./src/index.ts --compile --outfile ./bin/aisee",
     "build:linux-x64": "bun build ./src/index.ts --compile --target=bun-linux-x64-modern --outfile dist/aisee-linux-x64",
     "build:linux-arm64": "bun build ./src/index.ts --compile --target=bun-linux-arm64 --outfile dist/aisee-linux-arm64",
     "build:macos-x64": "bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile dist/aisee-darwin-x64",

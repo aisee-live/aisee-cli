@@ -4,6 +4,7 @@ import type { ModuleDescriptor } from "apcore-cli";
 import { APCore, Registry } from "apcore-js";
 import { Command } from "commander";
 import { getAppConfig, initDefaultConfig } from "./utils/config.ts";
+import { setLogLevel } from "./utils/log-level.ts";
 import { loginModule, logoutModule, whoamiModule } from "./modules/auth.ts";
 import {
   scanModule,
@@ -103,6 +104,11 @@ async function main() {
     apcli: false,
   });
 
+  program.hook("preAction", () => {
+    const level = program.opts().logLevel as string | undefined;
+    if (level) setLogLevel(level);
+  });
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (program as any).removeAllListeners("option:version");
   program.on("option:version", () => {
@@ -174,8 +180,15 @@ async function main() {
   // config
   const conf = program.command("config").description("CLI configuration");
   conf.addCommand(buildModuleCommand(makeDescriptor("config.list", configListModule), executor, 1000, "list"));
-  conf.addCommand(buildModuleCommand(makeDescriptor("config.set", configSetModule), executor, 1000, "set"));
-  conf.addCommand(buildModuleCommand(makeDescriptor("config.spec", configSpecModule), executor, 1000, "spec"));
+  conf.addCommand(withPositionals(
+    buildModuleCommand(makeDescriptor("config.set", configSetModule), executor, 1000, "set"),
+    "key",
+    "value",
+  ));
+  conf.addCommand(withPositionals(
+    buildModuleCommand(makeDescriptor("config.spec", configSpecModule), executor, 1000, "spec"),
+    "service",
+  ));
 
   try {
     await program.parseAsync(process.argv);

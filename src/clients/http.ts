@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import { loadCredentials, saveCredentials, clearCredentials, loadSettings, Settings } from "../utils/config.ts";
 import { authClient } from "./auth.ts";
+import { isDebug } from "../utils/log-level.ts";
 
 let isRefreshing = false;
 let failedQueue: any[] = [];
@@ -35,6 +36,17 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+      const res = error.response;
+
+      if (res && isDebug()) {
+        console.error(
+          `\n[API] ${originalRequest?.method?.toUpperCase() ?? "?"} ${originalRequest?.baseURL ?? ""}${originalRequest?.url ?? ""}`
+          + ` → ${res.status} ${res.statusText}`
+        );
+        if (res.data) {
+          console.error(`[API] body:`, JSON.stringify(res.data));
+        }
+      }
 
       if (error.response?.status === 401 && !originalRequest._retry) {
         if (isRefreshing) {

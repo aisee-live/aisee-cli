@@ -104,49 +104,39 @@ export async function getAppConfig(): Promise<Config> {
 export async function loadSettingsWithSource(): Promise<any> {
   const config = await getAppConfig();
 
-  const getDetail = (key: string): any => {
-    // Priority: config load (handles file + env overrides)
-    const value = config.get(`aisee.${key}`);
-    return {
-      value,
-      // Note: apcore Config does not expose the source string directly;
-      // this source tag is for UI guidance, logic is managed by apcore.
-      source: "apcore Managed"
-    };
-  };
+  const getValue = (key: string) => config.get(`aisee.${key}`);
 
   return {
-    authApiUrl: getDetail("auth_api_url"),
-    analysisApiUrl: getDetail("analysis_api_url"),
-    postAgentApiUrl: getDetail("post_agent_api_url"),
-    appUrl: getDetail("app_url"),
+    auth_api_url: getValue("auth_api_url"),
+    analysis_api_url: getValue("analysis_api_url"),
+    post_agent_api_url: getValue("post_agent_api_url"),
+    app_url: getValue("app_url"),
   };
 }
 
 export async function loadSettings(): Promise<Settings> {
   const detailed = await loadSettingsWithSource();
   return {
-    authApiUrl: detailed.authApiUrl.value,
-    analysisApiUrl: detailed.analysisApiUrl.value,
-    postAgentApiUrl: detailed.postAgentApiUrl.value,
-    appUrl: detailed.appUrl.value,
+    authApiUrl: detailed.auth_api_url,
+    analysisApiUrl: detailed.analysis_api_url,
+    postAgentApiUrl: detailed.post_agent_api_url,
+    appUrl: detailed.app_url,
   };
 }
 
 export async function saveSettings(settings: Partial<Settings>) {
   await ensureConfigDir();
 
-  // 1. Load current state via apcore
-  const config = Config.load(SETTINGS_FILE);
+  const raw = await readFile(SETTINGS_FILE, "utf-8");
+  const data = parse(raw) as Record<string, Record<string, string>>;
+  if (!data.aisee) data.aisee = {};
 
-  // 2. Update in-memory data
-  if (settings.authApiUrl) config.set("aisee.auth_api_url", settings.authApiUrl);
-  if (settings.analysisApiUrl) config.set("aisee.analysis_api_url", settings.analysisApiUrl);
-  if (settings.postAgentApiUrl) config.set("aisee.post_agent_api_url", settings.postAgentApiUrl);
-  if (settings.appUrl) config.set("aisee.app_url", settings.appUrl);
+  if (settings.authApiUrl !== undefined) data.aisee.auth_api_url = settings.authApiUrl;
+  if (settings.analysisApiUrl !== undefined) data.aisee.analysis_api_url = settings.analysisApiUrl;
+  if (settings.postAgentApiUrl !== undefined) data.aisee.post_agent_api_url = settings.postAgentApiUrl;
+  if (settings.appUrl !== undefined) data.aisee.app_url = settings.appUrl;
 
-  // 3. Write full data back to YAML
-  await writeFile(SETTINGS_FILE, stringify(config.data));
+  await writeFile(SETTINGS_FILE, stringify(data));
 }
 
 export async function saveCredentials(creds: Credentials) {

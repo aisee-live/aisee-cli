@@ -32,7 +32,9 @@ export const loginModule = {
   }),
   outputSchema: z.object({
     message: z.string().describe("Success message"),
-    user: UserResponseSchema.describe("Authenticated user profile")
+    id: z.string().describe("User ID"),
+    email: z.string().describe("User email"),
+    username: z.string().nullable().optional().describe("Username"),
   }),
   annotations: createAnnotations({ readonly: false }),
   async execute(input: any) {
@@ -78,7 +80,9 @@ export const loginModule = {
 
             resolve({
               message: `Successfully logged in as ${result.user.email}`,
-              user: result.user
+              id: result.user.id,
+              email: result.user.email,
+              username: result.user.username ?? null,
             });
           }
         } catch (err) {

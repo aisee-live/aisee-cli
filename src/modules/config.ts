@@ -7,11 +7,7 @@ export const configListModule = {
   inputSchema: z.object({}),
   async execute() {
     const settings = await loadSettingsWithSource();
-    return Object.entries(settings).map(([key, detail]) => ({
-      key,
-      value: detail.value,
-      source: detail.source,
-    }));
+    return Object.entries(settings).map(([key, value]) => ({ key, value }));
   },
 };
 

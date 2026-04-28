@@ -70,7 +70,7 @@ Retrieve the aggregated analysis report for a URL.
 aisee report https://example.com
 aisee report https://example.com --section ai-presence
 aisee report https://example.com --history          # list all historical versions
-aisee report https://example.com --version v3.0     # fetch a specific version
+aisee report https://example.com --ver 7.0          # fetch a specific version
 aisee report https://example.com --format json --fields result.total_score
 ```
 
@@ -78,20 +78,20 @@ aisee report https://example.com --format json --fields result.total_score
 |---|---|---|
 | `<url>` | required | Website URL |
 | `--section <name>` | `summary` | `summary`, `ai-presence`, `competitor`, `strategy`, `seo`, `mentions` |
-| `--version <v>` | — | Fetch a specific historical version |
+| `--ver <v>` | — | Fetch a specific historical version |
 | `--history` | false | List all available historical versions |
 
 ---
 
 ## Actions
 
-### `aisee actions list <url>`
+### `aisee actions <url>`
 List actionable optimization tasks for a site.
 
 ```bash
-aisee actions list https://example.com
-aisee actions list https://example.com --status pending --size 20
-aisee actions list https://example.com --format json
+aisee actions https://example.com
+aisee actions https://example.com --status pending --size 20
+aisee actions https://example.com --format json
 ```
 
 | Flag | Default | Description |
@@ -103,19 +103,19 @@ aisee actions list https://example.com --format json
 | `--sort-order <asc\|desc>` | `asc` | Sort direction |
 | `--status <s>` | — | Filter by status: `pending`, `in_progress`, `completed` |
 
-### `aisee actions suggest <actionId>`
+### `aisee action-suggest <actionId>`
 Get detailed AI-generated implementation suggestions for an action.
 
 ```bash
-aisee actions suggest abc-123
+aisee action-suggest abc-123
 ```
 
-### `aisee actions post <actionId>`
+### `aisee action-post <actionId>`
 Convert an action's implementation plan into a social media post draft.
 
 ```bash
-aisee actions post abc-123
-aisee actions post abc-123 --channel linkedin-page-id
+aisee action-post abc-123
+aisee action-post abc-123 --channel linkedin-page-id
 ```
 
 | Flag | Default | Description |

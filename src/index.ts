@@ -111,12 +111,13 @@ async function main() {
   });
 
   // Top-level commands  — scan/report take <url> positionally
+  // scan uses 900s to exceed the internal 600s scanAndWait timeout
   program.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("scan", scanModule), executor),
+    buildModuleCommand(makeDescriptor("scan", scanModule), executor, 900, "scan"),
     "url",
   ));
   program.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("report", reportModule), executor),
+    buildModuleCommand(makeDescriptor("report", reportModule), executor, 1000, "report"),
     "url",
   ));
 
@@ -131,10 +132,16 @@ async function main() {
     "url",
   ));
 
-  // action-suggest <url> <task-id> — top-level to avoid argv[2] ambiguity with subcommand names
+  // action-suggest <actionId> — top-level to avoid argv[2] ambiguity with subcommand names
   program.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "action-suggest"),
-    "url", "actionId",
+    "actionId",
+  ));
+
+  // action-post <actionId>
+  program.addCommand(withPositionals(
+    buildModuleCommand(makeDescriptor("actions.post", actionsPostModule), executor, 1000, "action-post"),
+    "actionId",
   ));
 
   // post — publish takes <id>, schedule takes <id> <time>

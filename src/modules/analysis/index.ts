@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { analysisClient } from "../../clients/analysis.ts";
+import { analysisClient, type TaskTreeNode } from "../../clients/analysis.ts";
 import { loadCredentials } from "../../utils/config.ts";
 import { productUrlSchema } from "../../utils/url.ts";
 import { UserError } from "../../utils/errors.ts";
@@ -81,7 +81,7 @@ function summarizeReport(record: Record<string, unknown>, section = "summary"): 
   if (record.name) meta.name = record.name;
 
   if (section === "summary") {
-    const agg = resultObj?.result as Record<string, unknown> | undefined;
+    const agg = (resultObj?.result ?? resultObj) as Record<string, unknown> | undefined;
     const childrenScores = (agg?.children_scores ?? {}) as Record<string, number>;
     const subScores: Record<string, string> = {};
     for (const [code, score] of Object.entries(childrenScores)) {
@@ -135,22 +135,116 @@ export const scanModule = {
     url: productUrlSchema.describe("Website URL to scan"),
     task_template_id: z.string().optional().describe("Specify a custom task template ID"),
     streaming: z.boolean().default(false).describe("Enable streaming HTTP response from the analysis API"),
-    use_demo: z.boolean().default(false).describe("Use demo mode for testing (no credits consumed)")
+    use_demo: z.boolean().default(false).describe("Use demo mode for testing (no credits consumed)"),
+    no_wait: z.boolean().default(false).describe("Return immediately after submitting without waiting for results")
   }),
-  outputSchema: z.object({
-    task_id: z.string(),
-    product_id: z.string(),
-    status: z.string(),
-    created_at: z.string()
-  }),
+  outputSchema: z.any(),
   async execute(input: any) {
-    return await analysisClient.scan(input.url, {
-      task_template_id: input.task_template_id,
-      stream: input.streaming,
-      use_demo: input.use_demo
-    });
+    if (input.no_wait) {
+      const data = await analysisClient.scan(input.url, {
+        task_template_id: input.task_template_id,
+        stream: input.streaming,
+        use_demo: input.use_demo
+      });
+      if (process.stderr.isTTY) {
+        process.stderr.write(`Scan submitted. Run 'aisee report ${input.url}' to check results.\n`);
+      }
+      return data;
+    }
+
+    const isTTY = process.stderr.isTTY;
+    const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    let prevLineCount = 0;
+
+    function statusIcon(status: string, frame: number): string {
+      if (status === "completed") return "✓";
+      if (status === "failed") return "✗";
+      if (status === "ignored") return "-";
+      if (status === "in_progress" || status === "processing") return frames[frame % frames.length];
+      return "○";
+    }
+
+    function renderNode(node: TaskTreeNode, depth: number, frame: number): string[] {
+      const indent = "  ".repeat(depth);
+      const icon = statusIcon(node.task.status, frame);
+      const lines = [`${indent}${icon} ${node.task.name}`];
+      for (const child of node.children ?? []) {
+        lines.push(...renderNode(child, depth + 1, frame));
+      }
+      return lines;
+    }
+
+    if (isTTY) process.stderr.write("Analyzing...\n");
+
+    const result = await analysisClient.scanAndWait(
+      input.url,
+      { task_template_id: input.task_template_id, stream: input.streaming, use_demo: input.use_demo },
+      isTTY ? (tree: TaskTreeNode, frame: number) => {
+        if (frame === 0) {
+          const version = tree.task.version_name ? `Version ${tree.task.version_name}` : "";
+          process.stderr.write(`\x1b[1A\x1b[2K\rScan started ${version}\nPress Ctrl+C to stop monitoring — scan continues in background.\n\n`);
+          prevLineCount = 0;
+        }
+        if (prevLineCount > 0) {
+          process.stderr.write(`\x1b[${prevLineCount}A\x1b[J`);
+        }
+        const version = tree.task.version_name ? `  [${tree.task.version_name}]` : "";
+        const lines = renderNode(tree, 0, frame);
+        if (lines.length > 0) lines[0] += version;
+        prevLineCount = lines.length;
+        process.stderr.write(lines.join("\n") + "\n");
+      } : undefined
+    );
+
+    if (isTTY && prevLineCount > 0) {
+      process.stderr.write(`\x1b[${prevLineCount}A\x1b[J`);
+    }
+
+    if (getEffectiveFormat() !== "table") return result;
+    return formatScanResult(result as Record<string, unknown>);
   }
 };
+
+function formatScanResult(raw: Record<string, unknown>): string {
+  const root = (raw?.result ?? raw) as Record<string, unknown>;
+  const parts: string[] = [];
+
+  // scores
+  const scores: Record<string, unknown> = {};
+  if (typeof root.total_score === "number") scores.total_score = root.total_score.toFixed(2);
+  const children = root.children_scores as Record<string, number> | undefined;
+  if (children) {
+    for (const [k, v] of Object.entries(children)) {
+      scores[k.replace(/^code_/, "").replace(/_analyzer$/, "")] = (v as number).toFixed(2);
+    }
+  }
+  if (Object.keys(scores).length > 0) parts.push(formatKeyValueTable(scores));
+
+  // score breakdown
+  const breakdown = root.score_breakdown as Record<string, number> | undefined;
+  if (breakdown) {
+    const bd: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(breakdown)) bd[k] = (v as number).toFixed(2);
+    parts.push("\n--- score breakdown ---\n" + formatKeyValueTable(bd));
+  }
+
+  // summary (deduplicated)
+  const summary = root.summary as string[] | string | undefined;
+  if (summary) {
+    const lines = (Array.isArray(summary) ? summary : [summary]);
+    const unique = [...new Set(lines)];
+    parts.push("\n--- summary ---\n" + unique.join("\n"));
+  }
+
+  // recommendations (deduplicated, first 5)
+  const recs = root.recommendations as string[] | undefined;
+  if (Array.isArray(recs) && recs.length > 0) {
+    const unique = [...new Set(recs)].slice(0, 5);
+    parts.push("\n--- recommendations ---\n" + unique.map((r, i) => `${i + 1}. ${r}`).join("\n"));
+  }
+
+  return parts.join("\n");
+}
 
 export const reportModule = {
   description: "Retrieve aggregated analysis reports for a product",
@@ -158,7 +252,7 @@ export const reportModule = {
     url: productUrlSchema.describe("Website URL associated with the product"),
     section: z.enum(["summary", "presence", "competitor", "strategy"])
       .optional().default("summary").describe("Report section: summary | presence | competitor | strategy"),
-    version: z.string().optional().describe("Fetch a specific historical version (e.g. v2.0)"),
+    ver: z.string().optional().describe("Fetch a specific historical version (e.g. 7.0)"),
     history: z.boolean().optional().describe("List all available historical versions for this URL")
   }),
   outputSchema: z.any(),
@@ -212,7 +306,7 @@ export const reportModule = {
     const section = input.section ?? "summary";
 
     const raw = await analysisClient.getReport(input.url, {
-      version: input.version,
+      version: input.ver,
       user_id: creds?.userId
     }).catch((err: unknown) => {
       const status = (err as { response?: { status?: number } }).response?.status;
@@ -243,6 +337,14 @@ function summarizeAction(item: Record<string, unknown>): Record<string, unknown>
     status: item.status,
   };
   if (item.description) out.description = String(item.description).slice(0, 80);
+
+  const solutions = item.solution_data;
+  if (Array.isArray(solutions) && solutions.length > 0) {
+    out.solution = (solutions as TaskItem[])
+      .map(s => `[${(s.type ?? "?").toUpperCase()}] ${String(s.title ?? "").slice(0, 60)}`)
+      .join("\n" + " ".repeat(16));
+  }
+
   return out;
 }
 
@@ -289,15 +391,81 @@ export const actionsListModule = {
   }
 };
 
+function getEffectiveFormat(): string {
+  const fmtIdx = process.argv.indexOf("--format");
+  const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
+  return fmt ?? (process.stdout.isTTY ? "table" : "json");
+}
+
+type TaskItem = {
+  type?: string;
+  platform?: string;
+  title?: string;
+  content?: string;
+  code?: string;
+  steps?: unknown[];
+  [k: string]: unknown;
+};
+
+function formatSuggestTask(task: TaskItem, index: number, total: number): string {
+  const lines: string[] = [];
+  const typeLabel = task.type === "TECHNICAL" ? "TECHNICAL" : "CONTENT";
+  lines.push(`[${index + 1}/${total}] [${typeLabel}] ${task.title ?? "(no title)"}`);
+
+  if (task.type === "CONTENT") {
+    if (task.platform) lines.push(`Platform: ${task.platform}`);
+    if (task.content) lines.push("", task.content.trim());
+  } else {
+    // TECHNICAL and any future types
+    if (task.content) lines.push("", task.content.trim());
+    if (task.code) lines.push("", task.code.trim());
+    if (Array.isArray(task.steps) && task.steps.length > 0) {
+      lines.push("", "Steps:");
+      task.steps.forEach((step, i) => lines.push(`  ${i + 1}. ${String(step)}`));
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function formatTaskResult(data: Record<string, unknown>): string {
+  const parts: string[] = [];
+
+  const tasks = data.tasks;
+  const taskList: TaskItem[] = Array.isArray(tasks) ? tasks : [];
+
+  const meta: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (k === "tasks") continue;
+    if (v !== null && v !== undefined && typeof v !== "object") meta[k] = v;
+  }
+  if (Object.keys(meta).length > 0) {
+    parts.push(formatKeyValueTable(meta));
+  }
+
+  if (taskList.length > 0) {
+    parts.push("");
+    for (let i = 0; i < taskList.length; i++) {
+      parts.push(formatSuggestTask(taskList[i], i, taskList.length));
+      if (i < taskList.length - 1) parts.push("\n" + "─".repeat(60));
+    }
+  }
+
+  return parts.join("\n");
+}
+
 export const actionsSuggestModule = {
   description: "Get detailed AI implementation suggestions",
   inputSchema: z.object({
-    url: productUrlSchema.describe("Website URL"),
     actionId: z.string().describe("Action task ID"),
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    return await analysisClient.getSuggestion(input.actionId);
+    const data = await analysisClient.getSuggestion(input.actionId);
+    if (getEffectiveFormat() === "table") {
+      return formatTaskResult(data as Record<string, unknown>);
+    }
+    return data;
   }
 };
 
@@ -309,6 +477,10 @@ export const actionsPostModule = {
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    return await analysisClient.convertToPost(input.actionId, input.channel);
+    const data = await analysisClient.convertToPost(input.actionId, input.channel);
+    if (getEffectiveFormat() === "table") {
+      return formatTaskResult(data as Record<string, unknown>);
+    }
+    return data;
   }
 };

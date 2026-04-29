@@ -133,21 +133,34 @@ export const scanModule = {
   description: "Start AEO analysis for a product with complete task orchestration",
   inputSchema: z.object({
     url: productUrlSchema.describe("Website URL to scan"),
-    task_template_id: z.string().optional().describe("Specify a custom task template ID"),
+    module: z.string().optional().describe("Specify a module to scan"),
     streaming: z.boolean().default(false).describe("Enable streaming HTTP response from the analysis API"),
     use_demo: z.boolean().default(false).describe("Use demo mode for testing (no credits consumed)"),
-    no_wait: z.boolean().default(false).describe("Return immediately after submitting without waiting for results")
+    wait: z.boolean().default(true).describe("Wait for scan results (use --no-wait to return immediately after submitting)")
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    if (input.no_wait) {
-      const data = await analysisClient.scan(input.url, {
-        task_template_id: input.task_template_id,
-        stream: input.streaming,
-        use_demo: input.use_demo
-      });
+    const baseParams = { stream: input.streaming, use_demo: input.use_demo };
+    if (input.wait === false) {
+      let data: any;
+      if (input.module) {
+        const analyzerKey = SECTION_TO_ANALYZER_KEY[input.module] ?? input.module;
+        data = await analysisClient.scanModule(input.url, analyzerKey, baseParams);
+      } else {
+        data = await analysisClient.scan(input.url, baseParams);
+      }
       if (process.stderr.isTTY) {
         process.stderr.write(`Scan submitted. Run 'aisee report ${input.url}' to check results.\n`);
+      }
+      if (data && typeof data === "object") {
+        const d = data as Record<string, unknown>;
+        const taskTree = d.task_tree as { task?: Record<string, unknown> } | undefined;
+        const versionName = taskTree?.task?.version_name;
+        const flat = Object.fromEntries(
+          Object.entries(d).filter(([, v]) => v === null || typeof v !== "object")
+        );
+        if (versionName !== undefined) flat.version = versionName;
+        return flat;
       }
       return data;
     }
@@ -175,26 +188,38 @@ export const scanModule = {
     }
 
     if (isTTY) process.stderr.write("Analyzing...\n");
+    const onTree = isTTY ? (tree: TaskTreeNode, frame: number) => {
+      if (frame === 0) {
+        const version = tree.task.version_name ? `Version ${tree.task.version_name}` : "";
+        process.stderr.write(`\x1b[1A\x1b[2K\rScan started ${version}\nPress Ctrl+C to stop monitoring — scan continues in background.\n\n`);
+        prevLineCount = 0;
+      }
+      if (prevLineCount > 0) {
+        process.stderr.write(`\x1b[${prevLineCount}A\x1b[J`);
+      }
+      const version = tree.task.version_name ? `  [${tree.task.version_name}]` : "";
+      const lines = renderNode(tree, 0, frame);
+      if (lines.length > 0) lines[0] += version;
+      prevLineCount = lines.length;
+      process.stderr.write(lines.join("\n") + "\n");
+    } : undefined
 
-    const result = await analysisClient.scanAndWait(
-      input.url,
-      { task_template_id: input.task_template_id, stream: input.streaming, use_demo: input.use_demo },
-      isTTY ? (tree: TaskTreeNode, frame: number) => {
-        if (frame === 0) {
-          const version = tree.task.version_name ? `Version ${tree.task.version_name}` : "";
-          process.stderr.write(`\x1b[1A\x1b[2K\rScan started ${version}\nPress Ctrl+C to stop monitoring — scan continues in background.\n\n`);
-          prevLineCount = 0;
-        }
-        if (prevLineCount > 0) {
-          process.stderr.write(`\x1b[${prevLineCount}A\x1b[J`);
-        }
-        const version = tree.task.version_name ? `  [${tree.task.version_name}]` : "";
-        const lines = renderNode(tree, 0, frame);
-        if (lines.length > 0) lines[0] += version;
-        prevLineCount = lines.length;
-        process.stderr.write(lines.join("\n") + "\n");
-      } : undefined
-    );
+    let result: any;
+    if (input.module) {
+      const analyzerKey = SECTION_TO_ANALYZER_KEY[input.module] ?? input.module;
+      result = await analysisClient.scanModuleAndWait(
+        input.url,
+        analyzerKey,
+        { stream: input.streaming, use_demo: input.use_demo },
+        onTree
+      );
+    } else {
+      result = await analysisClient.scanAndWait(
+        input.url,
+        { stream: input.streaming, use_demo: input.use_demo },
+        onTree
+      );
+    }
 
     if (isTTY && prevLineCount > 0) {
       process.stderr.write(`\x1b[${prevLineCount}A\x1b[J`);

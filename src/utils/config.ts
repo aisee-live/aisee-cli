@@ -147,7 +147,9 @@ export async function saveCredentials(creds: Credentials) {
 export async function loadCredentials(): Promise<Credentials | null> {
   try {
     const data = await readFile(CREDENTIALS_FILE, "utf-8");
-    return JSON.parse(data);
+    const parsed = JSON.parse(data) as Partial<Credentials>;
+    if (!parsed.accessToken || !parsed.refreshToken) return null;
+    return parsed as Credentials;
   } catch {
     return null;
   }

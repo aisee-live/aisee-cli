@@ -1,6 +1,7 @@
 import { postAgentAxios } from "./http.ts";
 import { authClient } from "./auth.ts";
 import { loadCredentials, loadSettings, saveCredentials } from "../utils/config.ts";
+import { isDebug } from "../utils/log-level.ts";
 import { basename } from "node:path";
 
 function generateId(length = 10): string {
@@ -18,7 +19,11 @@ function textToHtml(text: string): string {
 
 function toLocalISOString(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  const offsetMin = -date.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMin);
+  const tz = `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${tz}`;
 }
 
 function normalizeScheduleDate(schedule: string): string {
@@ -129,7 +134,13 @@ export const postAgentClient = {
     };
 
     const response = await postAgentAxios.post(`/posts`, payload);
-    return response.data;
+    if (isDebug()) {
+      console.error("[DEBUG] createPost payload:", JSON.stringify(payload, null, 2));
+      console.error("[DEBUG] createPost response:", JSON.stringify(response.data, null, 2));
+    }
+    const inferredState = payload.type === "schedule" ? "QUEUE" : "SENT";
+    const raw: any[] = Array.isArray(response.data) ? response.data : [response.data];
+    return raw.map((item: any) => ({ ...item, state: item.state ?? inferredState }));
   },
 
   async uploadMedia(filePath: string): Promise<MediaObject> {

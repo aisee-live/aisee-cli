@@ -51,7 +51,7 @@ export const postCreateModule = {
     return rows.map(r => {
       const lines: string[] = [
         `postId   ${r.postId ?? r.id ?? ""}`,
-        `state    ${r.state ?? ""}`,
+        `state    ${r.state ?? r.status ?? ""}`,
       ];
       if (r.releaseURL) lines.push(`url      ${r.releaseURL}`);
       return lines.join("\n");

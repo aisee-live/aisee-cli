@@ -29,6 +29,7 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
     if (creds?.accessToken) {
       config.headers.Authorization = `Bearer ${creds.accessToken}`;
     }
+    config.headers["x-timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone;
     return config;
   });
 

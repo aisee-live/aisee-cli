@@ -29,12 +29,28 @@ export const postCreateModule = {
       throw new Error("Either 'text' or 'file' must be provided.");
     }
 
-    return await postAgentClient.createPost({
+    const results = await postAgentClient.createPost({
       text: content,
       channels: [input.channel],
       schedule: input.schedule,
       media: input.image ? [input.image] : []
     });
+
+    const fmtIdx = process.argv.indexOf("--format");
+    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
+    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
+
+    if (effectiveFmt !== "table") return results;
+
+    const rows: Record<string, unknown>[] = Array.isArray(results) ? results : [results];
+    return rows.map(r => {
+      const lines: string[] = [
+        `postId   ${r.postId ?? r.id ?? ""}`,
+        `state    ${r.state ?? ""}`,
+      ];
+      if (r.releaseURL) lines.push(`url      ${r.releaseURL}`);
+      return lines.join("\n");
+    }).join("\n\n");
   }
 };
 

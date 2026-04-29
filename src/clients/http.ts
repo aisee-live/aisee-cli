@@ -48,6 +48,16 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
         }
       }
 
+      // Retry once on intermittent TLS errors (cold connection / cert cache miss)
+      const isCertError =
+        error.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
+        error.code === "CERT_UNTRUSTED" ||
+        (typeof error.message === "string" && error.message.includes("certificate"));
+      if (isCertError && !originalRequest._tlsRetry) {
+        originalRequest._tlsRetry = true;
+        return instance(originalRequest);
+      }
+
       if (error.response?.status === 401 && !originalRequest._retry) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {

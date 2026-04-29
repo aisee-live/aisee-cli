@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { postAgentClient } from "../../clients/post-agent.ts";
+import { postAgentClient, type MediaObject } from "../../clients/post-agent.ts";
 import open from "open";
 import { loadSettingsWithSource } from "../../utils/config.ts";
 
@@ -29,11 +29,16 @@ export const postCreateModule = {
       throw new Error("Either 'text' or 'file' must be provided.");
     }
 
+    let media: MediaObject[] = [];
+    if (input.image) {
+      media = [await postAgentClient.uploadMedia(input.image)];
+    }
+
     const results = await postAgentClient.createPost({
       text: content,
       channels: [input.channel],
       schedule: input.schedule,
-      media: input.image ? [input.image] : []
+      media,
     });
 
     const fmtIdx = process.argv.indexOf("--format");

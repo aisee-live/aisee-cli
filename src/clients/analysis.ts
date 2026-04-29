@@ -63,7 +63,7 @@ export const analysisClient = {
     throw new Error("Scan timed out after 10 minutes");
   },
 
-  async getPostList(options: { product_id?: string; user_id?: string; status?: string; business_type?: string; size?: number } = {}) {
+  async getPostList(options: { product_id?: string; user_id?: string; status?: string; business_type?: string; page?: number; size?: number } = {}) {
     // Note: The orchestrator handles URL to product_id mapping if URL is passed
     const response = await analysisAxios.get(`/task`, {
       params: { ...options }

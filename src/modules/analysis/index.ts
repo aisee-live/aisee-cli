@@ -253,7 +253,9 @@ export const reportModule = {
     section: z.enum(["summary", "presence", "competitor", "strategy"])
       .optional().default("summary").describe("Report section: summary | presence | competitor | strategy"),
     ver: z.string().optional().describe("Fetch a specific historical version (e.g. 7.0)"),
-    history: z.boolean().optional().describe("List all available historical versions for this URL")
+    history: z.boolean().optional().describe("List all available historical versions for this URL"),
+    page: z.number().int().min(1).optional().describe("Page number for history listing (default: 1)"),
+    size: z.number().int().min(1).max(100).optional().describe("Number of items per page for history listing (default: 10)")
   }),
   outputSchema: z.any(),
   async execute(input: any) {
@@ -264,7 +266,9 @@ export const reportModule = {
       const raw = await analysisClient.getPostList({
         product_id: input.url,
         user_id: creds?.userId,
-        status: "completed"
+        status: "completed",
+        page: input.page,
+        size: input.size
       }).catch((err: unknown) => {
         const status = (err as { response?: { status?: number } }).response?.status;
         if (status === 404) throw notFoundError(input.url);

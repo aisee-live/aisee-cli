@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { postAgentClient } from "../../clients/post-agent.ts";
 import open from "open";
+import { loadSettingsWithSource } from "../../utils/config.ts";
 
 export const postCreateModule = {
   description: "Create and prepare a new social media post for one or more channels",
@@ -18,7 +19,7 @@ export const postCreateModule = {
   }),
   async execute(input: any) {
     let content = input.text;
-    
+
     if (input.file) {
       const { readFile } = await import("node:fs/promises");
       content = await readFile(input.file, "utf-8");
@@ -40,11 +41,11 @@ export const postCreateModule = {
 function summarizePost(p: Record<string, unknown>): Record<string, unknown> {
   const content = String(p.content ?? p.text ?? p.message ?? "").trim();
   return {
-    id:         p.id,
-    state:      p.state ?? p.status,
-    platform:   (p.integration as any)?.identifier ?? p.platform ?? p.channel,
-    content:    content.length > 60 ? content.slice(0, 57) + "..." : content,
-    scheduled:  p.publishDate ?? p.scheduled_at ?? p.scheduleDate,
+    id: p.id,
+    state: p.state ?? p.status,
+    platform: (p.integration as any)?.identifier ?? p.platform ?? p.channel,
+    content: content.length > 60 ? content.slice(0, 57) + "..." : content,
+    scheduled: p.publishDate ?? p.scheduled_at ?? p.scheduleDate,
     created_at: p.createdAt ?? p.created_at,
   };
 }
@@ -53,11 +54,12 @@ export const postListModule = {
   description: "Retrieve a list of social media posts with filtering",
   inputSchema: z.object({
     state: z.enum(["DRAFT", "QUEUE", "PUBLISHED", "ERROR"]).optional().describe("Filter posts by their current state"),
-    limit: z.number().int().min(1).max(100).default(10).describe("Number of items per page")
+    size: z.number().int().min(1).max(100).default(10).describe("Number of items per page"),
+    page: z.number().int().min(1).optional().describe("Page number (default: 1)")
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    const raw = await postAgentClient.listPosts({ state: input.state, pageSize: input.limit });
+    const raw = await postAgentClient.listPosts({ state: input.state, pageSize: input.size, page: input.page });
 
     const fmtIdx = process.argv.indexOf("--format");
     const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
@@ -68,7 +70,7 @@ export const postListModule = {
     const items: Record<string, unknown>[] = Array.isArray(raw?.results) ? raw.results : [];
     const pagination = {
       total: raw?.total ?? items.length,
-      page:  raw?.page ?? 1,
+      page: raw?.page ?? 1,
       pages: raw?.totalPages ?? 1,
     };
 
@@ -117,7 +119,7 @@ export const channelAddModule = {
   description: "Connect a new social media account via OAuth",
   inputSchema: z.object({
     platform: z.enum([
-      "x", "reddit", "linkedin", "linkedin-page", "instagram", 
+      "x", "reddit", "linkedin", "linkedin-page", "instagram",
       "facebook", "youtube", "tiktok", "pinterest", "threads",
       "mastodon", "bluesky", "medium", "devto", "hashnode"
     ]).describe("Social platform to connect")
@@ -126,7 +128,8 @@ export const channelAddModule = {
     message: z.string()
   }),
   async execute(input: any) {
-    const url = `https://app.aisee.ai/channels/add/${input.platform}`;
+    const settings = await loadSettingsWithSource()
+    const url = `${settings.app_url}/post/channels/add/${input.platform}`;
     await open(url);
     return { message: `Opening browser to authorize ${input.platform} connection...` };
   }
@@ -141,7 +144,20 @@ export const channelRemoveModule = {
     success: z.boolean()
   }),
   async execute(input: any) {
-    return await postAgentClient.removeChannel(input.id);
+    const data = await postAgentClient.removeChannel(input.id) as Record<string, unknown>;
+    const success = data?.deletedAt != null;
+
+    const fmtIdx = process.argv.indexOf("--format");
+    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
+    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
+
+    if (effectiveFmt === "table") {
+      return success
+        ? `Channel '${data.name ?? input.id}' removed successfully.`
+        : `Failed to remove channel '${input.id}'.`;
+    }
+
+    return { success };
   }
 };
 
@@ -180,13 +196,15 @@ export const postDashboardModule = {
     const stats = (data.posts_stats ?? {}) as Record<string, unknown>;
     const platforms = Array.isArray(data.channels_by_platform) ? data.channels_by_platform as Record<string, unknown>[] : [];
 
-    const overview = {
-      channel_count:           data.channel_count,
+    const overview: Record<string, unknown> = {
+      channel_count: data.channel_count,
       channel_connected_count: data.channel_connected_count,
-      impressions_total:       data.impressions_total,
-      traffics_total:          data.traffics_total,
-      published_this_period:   data.published_this_period,
-    } as Record<string, unknown>;
+      impressions_total: data.impressions_total,
+      traffics_total: data.traffics_total,
+      published_this_period: data.published_this_period,
+    };
+    if (data.post_send_limit != null) overview.post_send_limit = data.post_send_limit;
+    if (data.period_end != null) overview.period_end = data.period_end;
 
     const parts: string[] = [
       "=== Overview ===",

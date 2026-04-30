@@ -36,7 +36,7 @@ fi
 
 # Read version from package.json
 VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
-echo "  Publishing aisee v$VERSION (tag: $TAG)"
+echo "  Publishing @aisee/aisee v$VERSION (tag: $TAG)"
 
 # ── 2. Build Everything ───────────────────────────────────────────────────────
 echo ""
@@ -76,7 +76,7 @@ npm publish $NPM_FLAGS
 if [ "$DRY_RUN" = "0" ]; then
   echo ""
   echo "==> Verifying final published package..."
-  npm install -g "aisee@$VERSION" --prefer-online
+  npm install -g "@aisee/aisee@$VERSION" --prefer-online
   aisee --version
 fi
 
@@ -103,4 +103,4 @@ else
 fi
 
 echo ""
-echo "Done. aisee@$VERSION published."
+echo "Done. @aisee/aisee@$VERSION published."

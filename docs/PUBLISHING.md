@@ -1,7 +1,7 @@
 # Publishing Guide
 
 AISee CLI follows a **hybrid distribution** strategy:
-1.  **npm (Standard)**: The main `aisee` package is a standalone JavaScript bundle (~2MB) that runs on any Node.js (≥18) environment.
+1.  **npm (Standard)**: The main `@aisee/aisee` package is a standalone JavaScript bundle (~2MB) that runs on any Node.js (≥18) environment.
 2.  **Standalone Binaries**: Pre-compiled binaries (~60MB) are built for all major platforms for users who do not have a JS runtime installed.
 
 ---
@@ -9,11 +9,11 @@ AISee CLI follows a **hybrid distribution** strategy:
 ## Package Structure
 
 ```
-aisee                    ← main package (JS bundle, ~2 MB)
+@aisee/aisee             ← main package (JS bundle, ~2 MB)
   bin/aisee.js               ← The CLI entry point (runs on Node/Bun)
 ```
 
-Users installing via `npm install -g aisee` get the lightweight JS bundle.
+Users installing via `npm install -g @aisee/aisee` get the lightweight JS bundle.
 
 ---
 
@@ -34,7 +34,7 @@ bun run build:all
 
 ### 2. Publish to npm
 
-The `publish.sh` script builds the JS bundle and platform binaries, then publishes the main package. It also continues to publish platform-specific packages for users who prefer binary-only distributions.
+The `publish.sh` script builds the JS bundle and platform binaries, then publishes the main package `@aisee/aisee`.
 
 ```bash
 sh scripts/publish.sh
@@ -43,7 +43,7 @@ sh scripts/publish.sh
 ### 3. Verify the install
 
 ```bash
-npm install -g aisee
+npm install -g @aisee/aisee
 aisee --version
 ```
 

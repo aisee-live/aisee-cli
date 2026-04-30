@@ -1,5 +1,5 @@
 {
-  "name": "aisee",
+  "name": "@aisee/aisee",
   "version": "0.1.0",
   "description": "AISee Command Line Interface",
   "type": "module",

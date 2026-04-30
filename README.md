@@ -22,14 +22,14 @@ Command-line interface for [AISee](https://app.aisee.live) — automate AEO (Ans
 ### npm (recommended for Node.js users)
 
 ```bash
-npm install -g aisee
+npm install -g @aisee/aisee
 ```
 Installs a lightweight JS bundle that runs on your local Node.js.
 
 ### bun (recommended for Bun users)
 
 ```bash
-bun install -g aisee
+bun install -g @aisee/aisee
 ```
 
 ### Standalone Binary (no Node/Bun required)

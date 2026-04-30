@@ -1,6 +1,6 @@
 # AISee CLI — Technical Specification
 
-**Version:** 1.0.0  
+**Version:** 0.1.0  
 **Status:** Current  
 **Owner:** AISee Engineering
 
@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-AISee CLI is a lightweight, cross-platform CLI distributed primarily as a JavaScript bundle via npm, and secondarily as standalone compiled binaries for environment-agnostic use. It bridges two backend services:
+AISee CLI is a lightweight, cross-platform CLI distributed primarily as a JavaScript bundle via npm (@aisee/aisee), and secondarily as standalone compiled binaries for environment-agnostic use. It bridges two backend services:
 
 - **AISee Orchestrator** (`api.aisee.live`) — AEO analysis, scoring, and action recommendations.
 - **Post Agent** (`api-post.aisee.live`) — Social media post creation, scheduling, and channel management.
@@ -142,7 +142,7 @@ If refresh fails, credentials are cleared and the user is prompted to run `aisee
 The package is distributed as a single, lightweight JavaScript bundle:
 
 ```
-aisee
+@aisee/aisee
   bin/aisee.js       ← The CLI entry point (runs on Node/Bun)
 ```
 

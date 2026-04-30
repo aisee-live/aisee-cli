@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { analysisClient, type TaskTreeNode } from "../../clients/analysis.ts";
+import { postAgentClient } from "../../clients/post-agent.ts";
 import { loadCredentials } from "../../utils/config.ts";
 import { productUrlSchema } from "../../utils/url.ts";
 import { UserError } from "../../utils/errors.ts";
@@ -499,17 +500,71 @@ export const actionsSuggestModule = {
 };
 
 export const actionsPostModule = {
-  description: "Convert a task implementation plan into a social media post draft",
+  description: "Create social media posts from action solution data",
   inputSchema: z.object({
-    actionId: z.string().describe("Action ID to convert"),
-    channel: z.string().optional()
+    actionId: z.string().describe("Action ID to post"),
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    const data = await analysisClient.convertToPost(input.actionId, input.channel);
-    if (getEffectiveFormat() === "table") {
-      return formatTaskResult(data as Record<string, unknown>);
+    const action = await analysisClient.getAction(input.actionId);
+    if (!action) {
+      throw new UserError(`Action ${input.actionId} not found`);
     }
-    return data;
+
+    const productId = action.product_id || action.task_id;
+    if (!productId) {
+      throw new UserError(`Product ID not found for action ${input.actionId}`);
+    }
+
+    const product = await analysisClient.getProduct(productId);
+    const channels = product?.config?.channels || [];
+
+    const tasks = (action.solution_data || []) as TaskItem[];
+    const contentTasks = tasks.filter(t => t.type === "CONTENT");
+
+    if (contentTasks.length === 0) {
+      throw new UserError("No tasks with type 'CONTENT' found in this action.");
+    }
+
+    const postResults = [];
+
+    for (const task of contentTasks) {
+      const platform = task.platform;
+      if (!platform) continue;
+
+      const matchingChannels = channels.filter((c: any) => c.identifier === platform);
+
+      if (matchingChannels.length === 0) {
+        throw new UserError(`No matching channel found for platform '${platform}'. Please connect your ${platform} account first.`);
+      }
+
+      for (const channel of matchingChannels) {
+        const result = await postAgentClient.createPost({
+          text: task.content || task.title || "",
+          channels: [channel.id],
+        });
+        postResults.push({
+          task: task.title,
+          platform: platform,
+          channel: channel.name,
+          result: result
+        });
+      }
+    }
+
+    const effectiveFmt = getEffectiveFormat();
+    if (effectiveFmt !== "table") return postResults;
+
+    return postResults.map(r => {
+      const lines = [
+        `Task:     ${r.task}`,
+        `Platform: ${r.platform}`,
+        `Channel:  ${r.channel}`,
+      ];
+      const res = Array.isArray(r.result) ? r.result[0] : r.result;
+      if (res?.postId || res?.id) lines.push(`Post ID:  ${res.postId || res.id}`);
+      if (res?.state || res?.status) lines.push(`Status:   ${res.state || res.status}`);
+      return lines.join("\n");
+    }).join("\n\n");
   }
 };

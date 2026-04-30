@@ -238,23 +238,18 @@ export const analysisClient = {
     return data;
   },
 
-  async convertToPost(actionId: string, channelId?: string) {
-    const response = await cx(analysisAxios.post(`/action/${actionId}/generate-tasks`, null, {
-      params: { content_days: 1, channel_id: channelId }
-    }));
-    const data = response.data as { task_id?: string; status?: string };
-    if (data.task_id && data.status !== "completed" && data.status !== "failed") {
-      await analysisClient.pollUntilDone(data.task_id, "Generating post draft...");
-      const result = await cx(analysisAxios.post(`/action/${actionId}/generate-tasks`, null, {
-        params: { content_days: 1, channel_id: channelId }
-      }));
-      return result.data;
-    }
-    return data;
-  },
-
   async getUserInfo(userId: string) {
     const response = await cx(analysisAxios.get(`/user/${userId}`));
+    return response.data;
+  },
+
+  async getProduct(product_id: string) {
+    const response = await cx(analysisAxios.get(`/product/${product_id}`));
+    return response.data;
+  },
+
+  async getAction(action_id: string) {
+    const response = await cx(analysisAxios.get(`/action/${action_id}`));
     return response.data;
   },
 };

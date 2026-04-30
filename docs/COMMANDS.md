@@ -111,17 +111,15 @@ aisee action-suggest abc-123
 ```
 
 ### `aisee action-post <actionId>`
-Convert an action's implementation plan into a social media post draft.
+Create social media posts from an action's implementation suggestions. Discovers target channels automatically from the product configuration.
 
 ```bash
 aisee action-post abc-123
-aisee action-post abc-123 --channel linkedin-page-id
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `<actionId>` | required | Action ID |
-| `--channel <id>` | — | Target channel ID |
 
 ---
 

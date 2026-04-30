@@ -1,15 +1,10 @@
 #!/usr/bin/env sh
-# AISee CLI — publish all platform packages then the main package.
+# AISee CLI — publish the main package to npm and binaries to GitHub.
 #
 # Usage:
 #   sh scripts/publish.sh           # publish current version
 #   sh scripts/publish.sh --dry-run # preview without actually publishing
 #   sh scripts/publish.sh --tag next # publish under an npm dist-tag
-#
-# Prerequisites:
-#   - npm login (or NPM_TOKEN env var set in CI)
-#   - bun >= 1.0 installed
-#   - git repository with all changes committed
 set -e
 
 # ── Parse flags ──────────────────────────────────────────────────────────────
@@ -43,98 +38,24 @@ fi
 VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
 echo "  Publishing aisee v$VERSION (tag: $TAG)"
 
-# ── 2. Build and Verify Binaries ──────────────────────────────────────────────
+# ── 2. Build Everything ───────────────────────────────────────────────────────
 echo ""
-echo "==> Building all platform binaries..."
+echo "==> Building JS bundle and all platform binaries..."
 bun run build:all
 
-# Each entry: "<npm-name>  <os>  <cpu>  <dist-binary>"
-PLATFORMS="
-aisee-darwin-arm64  darwin  arm64  aisee-darwin-arm64
-aisee-darwin-x64    darwin  x64    aisee-darwin-x64
-aisee-linux-x64     linux   x64    aisee-linux-x64
-aisee-linux-arm64   linux   arm64  aisee-linux-arm64
-aisee-win32-x64     win32   x64    aisee-windows-x64.exe
-"
+# Verify JS bundle
+if [ ! -f "bin/aisee.js" ]; then
+  echo "  ERROR: bin/aisee.js not found — did build:all succeed?" >&2
+  exit 1
+fi
 
-echo "==> Verifying binaries exist..."
-# Avoid piped while loop to ensure variable visibility and error propagation
-SAVE_IFS=$IFS
-IFS='
-'
-for line in $PLATFORMS; do
-  [ -z "$(echo "$line" | tr -d ' ')" ] && continue
-  BINARY=$(echo "$line" | awk '{print $4}')
-  SRC="dist/$BINARY"
-  if [ ! -f "$SRC" ]; then
-    echo "  ERROR: $SRC not found — did build:all succeed?" >&2
-    exit 1
-  fi
-  echo "  ✔ $BINARY found."
-done
-IFS=$SAVE_IFS
-
-# ── 3. Publish each platform package ─────────────────────────────────────────
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
-
-echo ""
-echo "==> Publishing platform packages..."
-
-SAVE_IFS=$IFS
-IFS='
-'
-for line in $PLATFORMS; do
-  [ -z "$(echo "$line" | tr -d ' ')" ] && continue
-
-  PKG_NAME=$(echo "$line"  | awk '{print $1}')
-  PKG_OS=$(echo "$line"    | awk '{print $2}')
-  PKG_CPU=$(echo "$line"   | awk '{print $3}')
-  BINARY=$(echo "$line"    | awk '{print $4}')
-
-  SRC="dist/$BINARY"
-
-  # Determine bin filename inside the package (always "aisee" on Unix, "aisee.exe" on Windows)
-  case "$PKG_OS" in
-    win32) BIN_FILE="aisee.exe" ;;
-    *)     BIN_FILE="aisee" ;;
-  esac
-
-  PKG_DIR="$TMPDIR/$PKG_NAME"
-  mkdir -p "$PKG_DIR/bin"
-
-  cp "$SRC" "$PKG_DIR/bin/$BIN_FILE"
-  if [ "$PKG_OS" != "win32" ]; then
-    chmod +x "$PKG_DIR/bin/$BIN_FILE"
-  fi
-
-  # Write package.json
-  cat > "$PKG_DIR/package.json" <<EOF
-{
-  "name": "$PKG_NAME",
-  "version": "$VERSION",
-  "description": "AISee CLI binary — $PKG_OS $PKG_CPU",
-  "os": ["$PKG_OS"],
-  "cpu": ["$PKG_CPU"],
-  "bin": { "aisee": "./bin/$BIN_FILE" },
-  "files": ["bin/"]
-}
-EOF
-
-  echo "  Publishing $PKG_NAME@$VERSION..."
-  # shellcheck disable=SC2086
-  (cd "$PKG_DIR" && npm publish $NPM_FLAGS)
-done
-IFS=$SAVE_IFS
-
-# ── 4. Pre-publish validation ─────────────────────────────────────────────────
+# ── 3. Pre-publish validation ─────────────────────────────────────────────────
 echo ""
 echo "==> Pre-publish validation..."
 if [ "$DRY_RUN" = "1" ]; then
   echo "[dry-run] Would run: npm install -g . && aisee --version"
 else
   echo "  Installing local version globally for testing..."
-  # Use --force to overwrite any existing installation
   npm install -g .
   
   INSTALLED_VER=$(aisee --version)
@@ -145,22 +66,21 @@ else
   echo "  ✔ Pre-publish validation passed (aisee $INSTALLED_VER)."
 fi
 
-# ── 5. Publish main package ───────────────────────────────────────────────────
+# ── 4. Publish main package ───────────────────────────────────────────────────
 echo ""
 echo "==> Publishing main package (aisee@$VERSION)..."
 # shellcheck disable=SC2086
 npm publish $NPM_FLAGS
 
-# ── 6. Verify ─────────────────────────────────────────────────────────────────
+# ── 5. Verify ─────────────────────────────────────────────────────────────────
 if [ "$DRY_RUN" = "0" ]; then
   echo ""
   echo "==> Verifying final published package..."
-  # We use --prefer-online to ensure we hit the registry and not the local cache
   npm install -g "aisee@$VERSION" --prefer-online
   aisee --version
 fi
 
-# ── 7. GitHub Release ─────────────────────────────────────────────────────────
+# ── 6. GitHub Release ─────────────────────────────────────────────────────────
 echo ""
 echo "==> Preparing GitHub Release..."
 

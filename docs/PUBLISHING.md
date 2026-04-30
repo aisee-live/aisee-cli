@@ -1,37 +1,30 @@
 # Publishing Guide
 
-AISee CLI uses the **platform-optional-package** pattern (same as esbuild, Biome, Prisma).
-The main `aisee` package ships a Node.js dispatcher (`bin/aisee.js`) that resolves the
-correct pre-compiled binary at runtime. Each platform binary is an independent npm package
-listed as an optional dependency.
+AISee CLI follows a **hybrid distribution** strategy:
+1.  **npm (Standard)**: The main `aisee` package is a standalone JavaScript bundle (~2MB) that runs on any Node.js (≥18) environment.
+2.  **Standalone Binaries**: Pre-compiled binaries (~60MB) are built for all major platforms for users who do not have a JS runtime installed.
 
 ---
 
 ## Package Structure
 
 ```
-aisee                    ← main package (dispatcher only, ~10 KB)
-  bin/aisee.js               ← Node.js wrapper that finds & execs the binary
-  dist/                      ← local-build fallback (not published to npm)
-
-aisee-darwin-arm64      ← macOS Apple Silicon
-aisee-darwin-x64        ← macOS Intel
-aisee-linux-x64         ← Linux x86-64
-aisee-linux-arm64       ← Linux ARM64
-aisee-win32-x64         ← Windows x86-64
+aisee                    ← main package (JS bundle, ~2 MB)
+  bin/aisee.js               ← The CLI entry point (runs on Node/Bun)
 ```
 
-npm automatically installs only the matching optional package for the user's platform.
+Users installing via `npm install -g aisee` get the lightweight JS bundle.
 
 ---
 
 ## Step-by-step Release
 
-### 1. Build all binaries
+### 1. Build everything
 
 ```bash
 bun run build:all
 # Produces:
+#   bin/aisee.js (Node-compatible bundle)
 #   dist/aisee-darwin-arm64
 #   dist/aisee-darwin-x64
 #   dist/aisee-linux-x64
@@ -39,16 +32,15 @@ bun run build:all
 #   dist/aisee-windows-x64.exe
 ```
 
-### 2. Publish everything
+### 2. Publish to npm
 
-`publish.sh` handles all of this automatically — it creates temporary platform package
-directories, writes their `package.json`, and publishes them before publishing the main package.
+The `publish.sh` script builds the JS bundle and platform binaries, then publishes the main package. It also continues to publish platform-specific packages for users who prefer binary-only distributions.
 
 ```bash
 sh scripts/publish.sh
 ```
 
-### 4. Verify the install
+### 3. Verify the install
 
 ```bash
 npm install -g aisee
@@ -57,24 +49,20 @@ aisee --version
 
 ---
 
-## Development Install (no npm publish needed)
+## Development Workflow
 
 ```bash
 git clone <repo>
 cd aisee-cli
-bun install          # triggers prepare → builds dist/aisee-<platform>
-node bin/aisee.js --help   # or: ./aisee --help after prepare
+bun install          # installs deps
+bun run build        # builds bin/aisee.js
+node bin/aisee.js --help
 ```
-
-The `bin/aisee.js` dispatcher falls back to `dist/` when no optional platform package
-is installed, so the monorepo workflow is unaffected.
 
 ---
 
 ## Version Bump Checklist
 
-1. Update `version` in `package.json` (main).
-2. Update `version` in each `aisee-*` platform package (handled automatically by `publish.sh`).
-3. Update `optionalDependencies` in the main `package.json` to match.
-4. Run `bun run build:all`.
-5. Publish platform packages first, then the main package.
+1. Update `version` in `package.json`.
+2. Run `bun run build:all`.
+3. Execute `sh scripts/publish.sh`.

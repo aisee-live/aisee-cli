@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { createCli, buildModuleCommand, exitCodeForError, emitErrorTty, emitErrorJson } from "apcore-cli";
 import type { ModuleDescriptor } from "apcore-cli";
 import { APCore, Registry } from "apcore-js";
@@ -27,6 +27,7 @@ import { configListModule, configSetModule, configSpecModule } from "./modules/c
 import { zodToJsonSchema } from "./utils/zod-to-schema.ts";
 import { ExecutorAdapter } from "./utils/executor-adapter.ts";
 import { RegistryAdapter } from "./utils/registry-adapter.ts";
+import pkg from "../package.json" with { type: "json" };
 
 interface AiseeModule {
   description: string;
@@ -112,7 +113,7 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (program as any).removeAllListeners("option:version");
   program.on("option:version", () => {
-    process.stdout.write("1.0.0\n");
+    process.stdout.write(`${pkg.version}\n`);
     process.exit(0);
   });
 

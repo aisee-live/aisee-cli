@@ -5,7 +5,7 @@ import { parse } from "yaml";
 import chalk from "chalk";
 
 const CONFIG_FILE = join(homedir(), ".config", "aisee", "config.yaml");
-const OUTPUT_DIR = join(import.meta.dir, "..", "docs", "openapi");
+const OUTPUT_DIR = join(new URL(".", import.meta.url).pathname, "..", "docs", "openapi");
 
 async function sync() {
   console.log(chalk.bold("\n🔄 AISee OpenAPI Sync Tool\n"));

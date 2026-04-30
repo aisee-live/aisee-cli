@@ -1,6 +1,6 @@
 {
   "name": "aisee",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "AISee Command Line Interface",
   "type": "module",
   "bin": {
@@ -11,13 +11,15 @@
   ],
   "scripts": {
     "start": "bun run src/index.ts",
-    "build": "bun build ./src/index.ts --compile --outfile ./bin/aisee",
+    "build": "bun run build:js",
+    "build:js": "bun build ./src/index.ts --outfile ./bin/aisee.js --target node",
+    "build:bin": "bun build ./src/index.ts --compile --outfile ./bin/aisee",
     "build:linux-x64": "bun build ./src/index.ts --compile --target=bun-linux-x64-modern --outfile dist/aisee-linux-x64",
     "build:linux-arm64": "bun build ./src/index.ts --compile --target=bun-linux-arm64 --outfile dist/aisee-linux-arm64",
     "build:macos-x64": "bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile dist/aisee-darwin-x64",
     "build:macos-arm64": "bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/aisee-darwin-arm64",
     "build:windows-x64": "bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile dist/aisee-windows-x64.exe",
-    "build:all": "bun run build:linux-x64 && bun run build:linux-arm64 && bun run build:macos-x64 && bun run build:macos-arm64 && bun run build:windows-x64",
+    "build:all": "bun run build:js && bun run build:linux-x64 && bun run build:linux-arm64 && bun run build:macos-x64 && bun run build:macos-arm64 && bun run build:windows-x64",
     "prepare": "node scripts/prepare.js",
     "sync-openapi": "bun run scripts/sync-openapi.ts"
   },
@@ -36,13 +38,6 @@
     "ora": "^8.0.0",
     "yaml": "^2.8.3",
     "zod": "^3.22.0"
-  },
-  "optionalDependencies": {
-    "aisee-darwin-arm64": "^1.0.0",
-    "aisee-darwin-x64": "^1.0.0",
-    "aisee-linux-x64": "^1.0.0",
-    "aisee-linux-arm64": "^1.0.0",
-    "aisee-win32-x64": "^1.0.0"
   },
   "devDependencies": {
     "@types/bun": "latest",

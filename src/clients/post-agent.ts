@@ -2,7 +2,7 @@ import { postAgentAxios } from "./http.ts";
 import { authClient } from "./auth.ts";
 import { loadCredentials, loadSettings, saveCredentials } from "../utils/config.ts";
 import { isDebug } from "../utils/log-level.ts";
-import { basename } from "node:path";
+import { getFileBlob, basename } from "../utils/file-adapter.ts";
 
 function generateId(length = 10): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -146,11 +146,10 @@ export const postAgentClient = {
   async uploadMedia(filePath: string): Promise<MediaObject> {
     const [settings, creds] = await Promise.all([loadSettings(), loadCredentials()]);
 
-    const doUpload = (token: string | undefined) => {
+    const doUpload = async (token: string | undefined) => {
       const formData = new FormData();
-      // Bun.file returns a BunFile (Blob subclass) — avoids the Buffer→Blob
-      // conversion that breaks axios multipart serialization in Bun runtime.
-      formData.append("file", Bun.file(filePath), basename(filePath));
+      // getFileBlob returns a Blob-like object (BunFile in Bun, Blob in Node)
+      formData.append("file", await getFileBlob(filePath), basename(filePath));
       return fetch(`${settings.postAgentApiUrl}/media/upload-simple`, {
         method: "POST",
         body: formData,

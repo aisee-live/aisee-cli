@@ -22,5 +22,13 @@ if (!script) {
   process.exit(0);
 }
 
+try {
+  execSync("bun --version", { stdio: "ignore" });
+} catch {
+  console.warn("prepare: bun not found. Skipping standalone binary build.");
+  console.warn("i Standard JS bundle is still available for use with Node.js.");
+  process.exit(0);
+}
+
 console.log(`prepare: building for ${key} (bun run ${script})`);
 execSync(`bun run ${script}`, { stdio: "inherit" });

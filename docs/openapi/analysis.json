@@ -260,7 +260,7 @@
     "/task/product-latest-tasks/{product_id}": {
       "get": {
         "summary": "Get Product Latest Tasks",
-        "description": "Get the latest task for a product with its children recursively",
+        "description": "Get the latest task for a product with its children recursively. Supports both product UUID and website URL.",
         "operationId": "get_product_latest_tasks_task_product_latest_tasks__product_id__get",
         "security": [
           {
@@ -511,6 +511,22 @@
                 }
               ],
               "title": "Name"
+            }
+          },
+          {
+            "name": "version_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Name"
             }
           },
           {
@@ -954,9 +970,9 @@
     },
     "/product/create": {
       "post": {
-        "summary": "Create Product",
+        "summary": "Create",
         "description": "Create a new product",
-        "operationId": "create_product_product_create_post",
+        "operationId": "create_product_create_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1340,6 +1356,64 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product/config/channles": {
+      "post": {
+        "summary": "Config Channels",
+        "description": "config channels",
+        "operationId": "config_channels_product_config_channles_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "title": "Channles"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -7639,6 +7713,19 @@
             ],
             "title": "Result",
             "description": "Detailed evaluation results"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config",
+            "description": "Config settings"
           },
           "short_description": {
             "anyOf": [

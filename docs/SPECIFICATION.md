@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-AISee CLI is a compiled, single-binary CLI that bridges two backend services:
+AISee CLI is a lightweight, cross-platform CLI distributed primarily as a JavaScript bundle via npm, and secondarily as standalone compiled binaries for environment-agnostic use. It bridges two backend services:
 
 - **AISee Orchestrator** (`api.aisee.live`) — AEO analysis, scoring, and action recommendations.
 - **Post Agent** (`api-post.aisee.live`) — Social media post creation, scheduling, and channel management.
@@ -34,7 +34,7 @@ The CLI is thin by design: business logic lives in the backends. The CLI handles
 | Layer | Technology |
 |---|---|
 | Runtime (build) | Bun ≥ 1.0 |
-| Runtime (run) | Standalone binary — no Bun/Node required after install |
+| Runtime (run) | Node.js ≥ 18 / Bun ≥ 1.0 / Standalone Binary |
 | Language | TypeScript (strict mode) |
 | Core SDK | `apcore-js` ≥ 0.19.0 |
 | CLI SDK | `apcore-cli` 0.7.0 |
@@ -132,35 +132,21 @@ If refresh fails, credentials are cleared and the user is prompted to run `aisee
 
 | Script | Output | Trigger |
 |---|---|---|
-| `prepare` | `./aisee` (current platform) | Automatic on `bun install` |
-| `build:macos-arm64` | `dist/aisee-darwin-arm64` | Manual |
-| `build:macos-x64` | `dist/aisee-darwin-x64` | Manual |
-| `build:linux-x64` | `dist/aisee-linux-x64` | Manual |
-| `build:linux-arm64` | `dist/aisee-linux-arm64` | Manual |
-| `build:windows-x64` | `dist/aisee-windows-x64.exe` | Manual |
-| `build:all` | All five platforms | Manual / CI release |
-
-`prepare` builds only the local platform binary to keep `bun install` fast. Use `build:all` before cutting a release.
+| `build` | `./bin/aisee.js` (JS bundle) | Manual |
+| `build:bin` | `./bin/aisee` (local binary) | Manual |
+| `prepare` | `./bin/aisee` (local binary) | Automatic on `bun install` |
+| `build:all` | JS bundle + 5 platform binaries | Manual / CI release |
 
 ### 5.2 npm distribution
 
-The package uses the **platform-optional-package** pattern:
+The package is distributed as a single, lightweight JavaScript bundle:
 
 ```
-aisee (dispatcher)
-  optionalDependencies:
-    aisee-darwin-arm64   os:darwin  cpu:arm64
-    aisee-darwin-x64     os:darwin  cpu:x64
-    aisee-linux-x64      os:linux   cpu:x64
-    aisee-linux-arm64    os:linux   cpu:arm64
-    aisee-win32-x64      os:win32   cpu:x64
+aisee
+  bin/aisee.js       ← The CLI entry point (runs on Node/Bun)
 ```
 
-`bin/aisee.js` resolves the binary at runtime:
-1. Optional platform package (`aisee-<os>-<arch>`)
-2. Local `dist/` fallback (dev / monorepo)
-
-See [PUBLISHING.md](./PUBLISHING.md) for the full release checklist.
+For users without a JS runtime, pre-compiled standalone binaries are available for manual download or via platform-specific installers.
 
 ### 5.3 Installation scripts (from source)
 
@@ -304,6 +290,9 @@ Error [MODULE_EXECUTE_ERROR]: Failed to execute module 'scan': <message>
 ```bash
 # Run from source (no build step)
 bun run start
+
+# Build local JS bundle
+bun run build
 
 # Build local binary (also runs automatically on bun install)
 bun run prepare

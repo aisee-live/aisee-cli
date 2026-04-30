@@ -13,30 +13,33 @@ Command-line interface for [AISee](https://app.aisee.live) — automate AEO (Ans
 
 ## Requirements
 
-- Installed binary has **no runtime dependency** — ships as a self-contained native executable.
-- [Bun](https://bun.sh) ≥ 1.0 is only required to **build from source**.
+- **Run (Node.js)**: [Node.js](https://nodejs.org) ≥ 18.0. Standard npm package is lightweight (~2MB).
+- **Run (Standalone)**: No runtime dependency — ships as a self-contained native executable (~60MB).
+- **Build**: [Bun](https://bun.sh) ≥ 1.0 is required to build from source.
 
 ## Installation
 
-### npm / bun (recommended)
+### npm (recommended for Node.js users)
 
 ```bash
 npm install -g aisee
-# or
+```
+Installs a lightweight JS bundle that runs on your local Node.js.
+
+### bun (recommended for Bun users)
+
+```bash
 bun install -g aisee
 ```
 
-npm automatically downloads only the binary for your platform. No Bun required after install.
+### Standalone Binary (no Node/Bun required)
 
-### macOS / Linux — from source
+Download the pre-compiled binary for your platform from the [Releases](https://github.com/aisee-live/aisee-cli/releases) page.
 
 ```bash
-git clone <repository-url>
-cd aisee-cli
-bun install          # builds dist/aisee-<platform> via prepare script
-
-sh scripts/install.sh              # install to /usr/local/bin
-sh scripts/install.sh --prefix ~/.local   # or a custom prefix
+# macOS/Linux
+curl -L https://github.com/aisee-live/aisee-cli/releases/latest/download/aisee -o /usr/local/bin/aisee
+chmod +x /usr/local/bin/aisee
 ```
 
 ### Windows — from source
@@ -96,7 +99,7 @@ Output binaries land in `dist/`:
 
 | Layer | Package |
 |---|---|
-| Runtime | Bun ≥ 1.0 (build) / standalone binary (run) |
+| Runtime | Node.js ≥ 18 / Bun ≥ 1.0 / Standalone |
 | Language | TypeScript (strict) |
 | Core SDK | `apcore-js` ≥ 0.19.0 |
 | CLI SDK | `apcore-cli` 0.7.0 |

@@ -1,7 +1,19 @@
 {
   "name": "@aisee/aisee",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "AISee Command Line Interface",
+  "keywords": [
+    "aisee",
+    "cli",
+    "ai",
+    "seo",
+    "aeo",
+    "postiz",
+    "automation",
+    "content-distribution",
+    "seo-analysis",
+    "workflow"
+  ],
   "type": "module",
   "bin": {
     "aisee": "./bin/aisee.js"
@@ -26,6 +38,14 @@
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aisee-live/aisee-cli.git"
+  },
+  "homepage": "https://aisee.live",
+  "bugs": {
+    "url": "https://github.com/aisee-live/aisee-cli/issues"
   },
   "dependencies": {},
   "devDependencies": {

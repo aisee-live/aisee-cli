@@ -47,20 +47,21 @@
   "bugs": {
     "url": "https://github.com/aisee-live/aisee-cli/issues"
   },
-  "dependencies": {},
-  "devDependencies": {
-    "@types/bun": "latest",
-    "apdev-js": ">=0.2.4",
+  "dependencies": {
     "apcore-js": "^0.19.0",
     "apcore-cli": "^0.7.0",
-    "apcore-toolkit": "^0.5.0",
+    "apcore-toolkit": "^0.5.1",
     "axios": "^1.6.0",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "open": "^10.1.0",
     "ora": "^8.0.0",
-    "typescript": "^5.0.0",
     "yaml": "^2.8.3",
     "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "apdev-js": ">=0.2.4",
+    "typescript": "^5.0.0"
   }
 }

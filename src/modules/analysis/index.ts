@@ -520,7 +520,7 @@ export const actionsPostModule = {
     const channels = product?.config?.channels || [];
 
     const tasks = (action.solution_data || []) as TaskItem[];
-    const contentTasks = tasks.filter(t => t.type === "CONTENT");
+    const contentTasks = tasks.filter(t => t.type === "CONTENT" && !t?.post_id);
 
     if (contentTasks.length === 0) {
       throw new UserError("No tasks with type 'CONTENT' found in this action.");
@@ -529,10 +529,11 @@ export const actionsPostModule = {
     const postResults = [];
 
     for (const task of contentTasks) {
-      const platform = task.platform;
+      let platform = task.platform;
       if (!platform) continue;
+      if (platform == 'twitter') platform = 'x';
 
-      const matchingChannels = channels.filter((c: any) => c.identifier === platform);
+      const matchingChannels = channels.filter((c: any) => (c.identifier === platform && c.disable == false && !c?.deletedAt));
 
       if (matchingChannels.length === 0) {
         throw new UserError(`No matching channel found for platform '${platform}'. Please connect your ${platform} account first.`);

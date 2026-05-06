@@ -434,6 +434,8 @@ type TaskItem = {
   content?: string;
   code?: string;
   steps?: unknown[];
+  sn?: number;
+  post_id?: string;
   [k: string]: unknown;
 };
 
@@ -544,6 +546,11 @@ export const actionsPostModule = {
           text: task.content || task.title || "",
           channels: [channel.id],
         });
+        try {
+          await analysisClient.updateActionPost(action.id, task.sn!, result[0]?.postId);
+        } catch (error) {
+          console.log(error);
+        }
         postResults.push({
           task: task.title,
           platform: platform,

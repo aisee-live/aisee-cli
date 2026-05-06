@@ -105,6 +105,18 @@ async function main() {
     apcli: false,
   });
 
+  program.description("AISee CLI — AI-powered visibility analysis and content optimization");
+
+  const verboseOpt = program.options.find((o) => o.long === "--verbose");
+  if (verboseOpt) verboseOpt.description = "Show all options in help output";
+
+  program.removeAllListeners("afterHelp");
+  program.addHelpText("after", [
+    "",
+    "Use --help --verbose to show all options.",
+    "Use --help --man to display a formatted man page.",
+  ].join("\n"));
+
   program.hook("preAction", () => {
     const level = program.opts().logLevel as string | undefined;
     if (level) setLogLevel(level);

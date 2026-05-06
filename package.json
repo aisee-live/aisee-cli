@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "start": "bun run src/index.ts",
-    "build": "bun run build:js",
+    "build": "bun run build:js && bun run build:bin",
     "build:js": "bun build ./src/index.ts --outfile ./bin/aisee.js --target node",
     "build:bin": "bun build ./src/index.ts --compile --outfile ./bin/aisee",
     "build:linux-x64": "bun build ./src/index.ts --compile --target=bun-linux-x64-modern --outfile dist/aisee-linux-x64",

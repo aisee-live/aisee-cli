@@ -3447,6 +3447,63 @@
         }
       }
     },
+    "/action/{action_id}/set-post": {
+      "post": {
+        "summary": "Set Action Post",
+        "description": "Update action post id",
+        "operationId": "set_action_post_action__action_id__set_post_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionPost"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Set Action Post Action  Action Id  Set Post Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/feedback": {
       "get": {
         "summary": "Get Feedbacks",
@@ -6049,6 +6106,52 @@
         }
       }
     },
+    "/post-agent/integration/update": {
+      "post": {
+        "summary": "Update Integration Data",
+        "description": "update product config by integration updated",
+        "operationId": "update_integration_data_post_agent_integration_update_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationUpdateReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Update Integration Data Post Agent Integration Update Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health Check",
@@ -6077,6 +6180,33 @@
         ],
         "title": "ActionPosition",
         "description": "Action position"
+      },
+      "ActionPost": {
+        "properties": {
+          "sn": {
+            "type": "integer",
+            "title": "Sn",
+            "description": "Sequence number of the target solution item"
+          },
+          "post_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Post Id",
+            "description": "Post id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sn"
+        ],
+        "title": "ActionPost",
+        "description": "Action update post"
       },
       "ActionSourceModule": {
         "type": "string",
@@ -7215,6 +7345,31 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "IntegrationUpdateReq": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "IntegrationUpdateReq"
       },
       "LLMISPRequest": {
         "properties": {

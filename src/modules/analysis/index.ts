@@ -505,6 +505,7 @@ export const actionsPostModule = {
   description: "Create social media posts from action solution data",
   inputSchema: z.object({
     actionId: z.string().describe("Action ID to post"),
+    channelId: z.string().optional().describe("Only post to this channel ID. Default: all matching channels in product config"),
   }),
   outputSchema: z.any(),
   async execute(input: any) {
@@ -519,26 +520,44 @@ export const actionsPostModule = {
     }
 
     const product = await analysisClient.getProduct(productId);
-    const channels = product?.config?.channels || [];
+    const configChannels: any[] = product?.config?.channels || [];
+
+    if (configChannels.length === 0) {
+      throw new UserError("No channels configured for this product. Run 'aisee channels add' to connect.");
+    }
+
+    const activeChannels = input.channelId
+      ? configChannels.filter((c: any) => c.id === input.channelId)
+      : configChannels.filter((c: any) => c.disable == false && !c?.deletedAt);
+
+    if (activeChannels.length === 0) {
+      throw new UserError(
+        input.channelId
+          ? `Channel '${input.channelId}' not found in product config.`
+          : "No active channels in product config."
+      );
+    }
 
     const tasks = (action.solution_data || []) as TaskItem[];
     const contentTasks = tasks.filter(t => t.type === "CONTENT" && !t?.post_id);
 
     if (contentTasks.length === 0) {
-      throw new UserError("No tasks with type 'CONTENT' found in this action.");
+      throw new UserError("No unposted CONTENT tasks found in this action.");
     }
 
     const postResults = [];
+    const skippedPlatforms = new Set<string>();
 
     for (const task of contentTasks) {
       let platform = task.platform;
       if (!platform) continue;
       if (platform == 'twitter') platform = 'x';
 
-      const matchingChannels = channels.filter((c: any) => (c.identifier === platform && c.disable == false && !c?.deletedAt));
+      const matchingChannels = activeChannels.filter((c: any) => c.identifier === platform);
 
       if (matchingChannels.length === 0) {
-        throw new UserError(`No matching channel found for platform '${platform}'. Please connect your ${platform} account first.`);
+        skippedPlatforms.add(platform);
+        continue;
       }
 
       for (const channel of matchingChannels) {
@@ -558,6 +577,16 @@ export const actionsPostModule = {
           result: result
         });
       }
+    }
+
+    if (skippedPlatforms.size > 0) {
+      process.stderr.write(
+        `[skip] No connected channel for: ${[...skippedPlatforms].join(", ")}. Run 'aisee channels add' to connect.\n`
+      );
+    }
+
+    if (postResults.length === 0) {
+      throw new UserError("No tasks were posted. Connect a matching channel and try again.");
     }
 
     const effectiveFmt = getEffectiveFormat();

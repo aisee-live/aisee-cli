@@ -4,6 +4,13 @@ import { postAgentClient } from "../../clients/post-agent.ts";
 import { loadCredentials } from "../../utils/config.ts";
 import { productUrlSchema } from "../../utils/url.ts";
 import { UserError } from "../../utils/errors.ts";
+import { isDebug } from "../../utils/log-level.ts";
+
+function dbg(msg: string, data?: unknown): void {
+  if (!isDebug()) return;
+  const payload = data !== undefined ? ` ${JSON.stringify(data, null, 2)}` : "";
+  process.stderr.write(`[debug] ${msg}${payload}\n`);
+}
 
 function notFoundError(url: string): UserError {
   const hint = url.startsWith("http://")
@@ -519,8 +526,14 @@ export const actionsPostModule = {
       throw new UserError(`Product ID not found for action ${input.actionId}`);
     }
 
+    dbg("product_id", productId);
+
     const product = await analysisClient.getProduct(productId);
     const configChannels: any[] = product?.config?.channels || [];
+
+    dbg("product.config.channels", configChannels.map((c: any) => ({
+      id: c.id, identifier: c.identifier, name: c.name, disable: c.disable, deletedAt: c.deletedAt
+    })));
 
     if (configChannels.length === 0) {
       throw new UserError("No channels configured for this product. Run 'aisee channels add' to connect.");
@@ -528,7 +541,7 @@ export const actionsPostModule = {
 
     const activeChannels = input.channelId
       ? configChannels.filter((c: any) => c.id === input.channelId)
-      : configChannels.filter((c: any) => c.disable == false && !c?.deletedAt);
+      : configChannels.filter((c: any) => !c.disable && !c?.deletedAt);
 
     if (activeChannels.length === 0) {
       throw new UserError(
@@ -540,6 +553,10 @@ export const actionsPostModule = {
 
     const tasks = (action.solution_data || []) as TaskItem[];
     const contentTasks = tasks.filter(t => t.type === "CONTENT" && !t?.post_id);
+
+    dbg("solution_data content tasks", contentTasks.map(t => ({
+      sn: t.sn, platform: t.platform, post_id: t.post_id, title: String(t.title ?? "").slice(0, 60)
+    })));
 
     if (contentTasks.length === 0) {
       throw new UserError("No unposted CONTENT tasks found in this action.");

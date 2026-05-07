@@ -549,7 +549,7 @@ export const actionsPostModule = {
         try {
           await analysisClient.updateActionPost(action.id, task.sn!, result[0]?.postId);
         } catch (error) {
-          console.log(error);
+          process.stderr.write(`[warn] Failed to record post_id for sn=${task.sn}: ${error}\n`);
         }
         postResults.push({
           task: task.title,

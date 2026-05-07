@@ -254,7 +254,7 @@ export const analysisClient = {
   },
 
   async updateActionPost(action_id: string, sn: number, post_id: string) {
-    const response = await cx(analysisAxios.post(`/action/${action_id}`, { sn, post_id }));
+    const response = await cx(analysisAxios.post(`/action/${action_id}/set-post`, { sn, post_id }));
     return response.data;
   },
 };

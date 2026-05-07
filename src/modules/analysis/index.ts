@@ -565,10 +565,13 @@ export const actionsPostModule = {
           text: task.content || task.title || "",
           channels: [channel.id],
         });
-        try {
-          await analysisClient.updateActionPost(action.id, task.sn!, result[0]?.postId);
-        } catch (error) {
-          process.stderr.write(`[warn] Failed to record post_id for sn=${task.sn}: ${error}\n`);
+        const postId = result[0]?.postId;
+        if (postId != null && task.sn != null) {
+          try {
+            await analysisClient.updateActionPost(action.id, task.sn, postId);
+          } catch (error) {
+            process.stderr.write(`[warn] Failed to record post_id for sn=${task.sn}: ${error}\n`);
+          }
         }
         postResults.push({
           task: task.title,

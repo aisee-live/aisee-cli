@@ -1,5 +1,6 @@
 import { analysisAxios } from "./http.ts";
 import { UserError } from "../utils/errors.ts";
+import { getDomain } from "../utils/url.ts";
 
 function extractApiError(err: unknown): UserError {
   const e = err as { response?: { status?: number; data?: unknown } };
@@ -90,7 +91,8 @@ export const analysisClient = {
   },
 
   async scanModule(url: string, module_code: string, options: { stream?: boolean; use_demo?: boolean } = {}) {
-    const taskResponse = await cx(analysisAxios.get(`/task/product-latest-tasks/${url}`));
+    const productId = getDomain(url);
+    const taskResponse = await cx(analysisAxios.get(`/task/product-latest-tasks/${encodeURIComponent(productId)}`));
     if (!taskResponse.data) {
       throw new UserError(`Task not found: ${url}`);
     }
@@ -159,10 +161,11 @@ export const analysisClient = {
   },
 
   async getReport(url: string, options: { version?: string; section?: string; user_id?: string } = {}) {
+    const productId = getDomain(url);
     if (options?.version) {
       const response = await cx(analysisAxios.get(`/task`, {
         params: {
-          product_id: url,
+          product_id: productId,
           version_name: options.version,
           user_id: options.user_id
         }
@@ -172,7 +175,7 @@ export const analysisClient = {
       }
       return { success: false, error: `Version ${options.version} not found` };
     } else {
-      const response = await cx(analysisAxios.get(`/task/product-latest-tasks/${url}`, {
+      const response = await cx(analysisAxios.get(`/task/product-latest-tasks/${encodeURIComponent(productId)}`, {
         params: { section: options.section }
       }));
       return response.data;
@@ -180,9 +183,10 @@ export const analysisClient = {
   },
 
   async getActions(url: string, options: { module?: string; page?: number; size?: number; status?: string } = {}) {
+    const productId = getDomain(url);
     const response = await cx(analysisAxios.get(`/action`, {
       params: {
-        task_id: url,
+        task_id: productId,
         source_module: options.module,
         page: options.page,
         size: options.size,

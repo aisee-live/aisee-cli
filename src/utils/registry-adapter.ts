@@ -31,7 +31,7 @@ export class RegistryAdapter implements Registry {
       tags: def.tags,
       inputSchema: zodToJsonSchema(def.inputSchema),
       outputSchema: {},
-      annotations: def.annotations as Record<string, unknown> | undefined,
+      annotations: def.annotations as unknown as Record<string, unknown> | undefined,
       metadata: def.metadata,
     };
   }

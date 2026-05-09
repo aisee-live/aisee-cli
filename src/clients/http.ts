@@ -30,6 +30,13 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
       config.headers.Authorization = `Bearer ${creds.accessToken}`;
     }
     config.headers["x-timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    if (isDebug()) {
+      const fullUrl = `${config.baseURL ?? ""}${config.url ?? ""}`;
+      const params = config.params ? ` ?${new URLSearchParams(config.params).toString()}` : "";
+      process.stderr.write(`[debug] [API] ${config.method?.toUpperCase() ?? "GET"} ${fullUrl}${params}\n`);
+    }
+
     return config;
   });
 

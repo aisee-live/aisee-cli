@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { createCli, buildModuleCommand, exitCodeForError, emitErrorTty, emitErrorJson } from "apcore-cli";
+import { createCli, buildModuleCommand, exitCodeForError } from "apcore-cli";
 import type { ModuleDescriptor } from "apcore-cli";
 import { APCore, Registry } from "apcore-js";
 import { Command } from "commander";
 import { getAppConfig, initDefaultConfig } from "./utils/config.ts";
 import { setLogLevel } from "./utils/log-level.ts";
+import { emitErrorTty, emitErrorJson } from "./utils/emit-error.ts";
 import { loginModule, logoutModule, whoamiModule } from "./modules/auth.ts";
 import {
   scanModule,
@@ -103,30 +104,13 @@ async function main() {
     executor,
     progName: "aisee",
     apcli: false,
+    version: pkg.version,
+    description: "AISee CLI — AI-powered visibility analysis and content optimization",
   });
-
-  program.description("AISee CLI — AI-powered visibility analysis and content optimization");
-
-  const verboseOpt = program.options.find((o) => o.long === "--verbose");
-  if (verboseOpt) verboseOpt.description = "Show all options in help output";
-
-  program.removeAllListeners("afterHelp");
-  program.addHelpText("after", [
-    "",
-    "Use --help --verbose to show all options.",
-    "Use --help --man to display a formatted man page.",
-  ].join("\n"));
 
   program.hook("preAction", () => {
     const level = program.opts().logLevel as string | undefined;
     if (level) setLogLevel(level);
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (program as any).removeAllListeners("option:version");
-  program.on("option:version", () => {
-    process.stdout.write(`${pkg.version}\n`);
-    process.exit(0);
   });
 
   // Top-level commands  — scan/report take <url> positionally
@@ -154,13 +138,13 @@ async function main() {
   // action-suggest <actionId> — top-level to avoid argv[2] ambiguity with subcommand names
   program.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "action-suggest"),
-    "actionId",
+    "action_id",
   ));
 
   // action-post <actionId>
   program.addCommand(withPositionals(
     buildModuleCommand(makeDescriptor("actions.post", actionsPostModule), executor, 1000, "action-post"),
-    "actionId",
+    "action_id",
   ));
 
   // post — publish takes <id>, schedule takes <id> <time>

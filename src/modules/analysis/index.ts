@@ -2,7 +2,7 @@ import { z } from "zod";
 import { analysisClient, type TaskTreeNode } from "../../clients/analysis.ts";
 import { postAgentClient } from "../../clients/post-agent.ts";
 import { loadCredentials } from "../../utils/config.ts";
-import { productUrlSchema } from "../../utils/url.ts";
+import { productUrlSchema, normalizeProductUrl } from "../../utils/url.ts";
 import { UserError } from "../../utils/errors.ts";
 import { isDebug } from "../../utils/log-level.ts";
 
@@ -148,6 +148,7 @@ export const scanModule = {
   }),
   outputSchema: z.any(),
   async execute(input: any) {
+    input.url = normalizeProductUrl(input.url);
     const baseParams = { stream: input.streaming, use_demo: input.use_demo };
     if (input.wait === false) {
       let data: any;
@@ -292,6 +293,7 @@ export const reportModule = {
   }),
   outputSchema: z.any(),
   async execute(input: any) {
+    input.url = normalizeProductUrl(input.url);
     const creds = await loadCredentials();
     const isVerbose = process.argv.includes("--verbose");
 
@@ -398,6 +400,7 @@ export const actionsListModule = {
   }),
   outputSchema: z.any(),
   async execute(input: any) {
+    input.url = normalizeProductUrl(input.url);
     const raw = await analysisClient.getActions(input.url, input);
 
     if (process.argv.includes("--verbose")) return raw;
@@ -496,11 +499,11 @@ function formatTaskResult(data: Record<string, unknown>): string {
 export const actionsSuggestModule = {
   description: "Get detailed AI implementation suggestions",
   inputSchema: z.object({
-    actionId: z.string().describe("Action task ID"),
+    action_id: z.string().describe("Action task ID"),
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    const data = await analysisClient.getSuggestion(input.actionId);
+    const data = await analysisClient.getSuggestion(input.action_id);
     if (getEffectiveFormat() === "table") {
       return formatTaskResult(data as Record<string, unknown>);
     }
@@ -511,19 +514,19 @@ export const actionsSuggestModule = {
 export const actionsPostModule = {
   description: "Create social media posts from action solution data",
   inputSchema: z.object({
-    actionId: z.string().describe("Action ID to post"),
-    channelId: z.string().optional().describe("Only post to this channel ID. Default: all matching channels in product config"),
+    action_id: z.string().describe("Action ID to post"),
+    channel_id: z.string().optional().describe("Only post to this channel ID. Default: all matching channels in product config"),
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    const action = await analysisClient.getAction(input.actionId);
+    const action = await analysisClient.getAction(input.action_id);
     if (!action) {
-      throw new UserError(`Action ${input.actionId} not found`);
+      throw new UserError(`Action ${input.action_id} not found`);
     }
 
     const productId = action.product_id || action.task_id;
     if (!productId) {
-      throw new UserError(`Product ID not found for action ${input.actionId}`);
+      throw new UserError(`Product ID not found for action ${input.action_id}`);
     }
 
     dbg("product_id", productId);
@@ -539,14 +542,14 @@ export const actionsPostModule = {
       throw new UserError("No channels configured for this product. Run 'aisee channels add' to connect.");
     }
 
-    const activeChannels = input.channelId
-      ? configChannels.filter((c: any) => c.id === input.channelId)
+    const activeChannels = input.channel_id
+      ? configChannels.filter((c: any) => c.id === input.channel_id)
       : configChannels.filter((c: any) => !c.disable && !c?.deletedAt);
 
     if (activeChannels.length === 0) {
       throw new UserError(
-        input.channelId
-          ? `Channel '${input.channelId}' not found in product config.`
+        input.channel_id
+          ? `Channel '${input.channel_id}' not found in product config.`
           : "No active channels in product config."
       );
     }

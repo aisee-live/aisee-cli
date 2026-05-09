@@ -2072,6 +2072,187 @@
         ]
       }
     },
+    "/posts/list/locate": {
+      "get": {
+        "operationId": "PostsController_locatePostInList",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "query",
+            "description": "Post id whose page within /posts/list to locate",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "QUEUE",
+                "PUBLISHED",
+                "ERROR",
+                "DRAFT"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "integrationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "description": "Filter by provider type (e.g. x, reddit, linkedin)",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "reddit",
+                  "linkedin",
+                  "linkedin-page",
+                  "instagram",
+                  "instagram-standalone",
+                  "facebook",
+                  "youtube",
+                  "tiktok",
+                  "pinterest",
+                  "threads",
+                  "mastodon",
+                  "bluesky",
+                  "medium",
+                  "devto",
+                  "hashnode",
+                  "wordpress",
+                  "discord",
+                  "slack",
+                  "telegram",
+                  "dribbble",
+                  "kick",
+                  "twitch",
+                  "lemmy",
+                  "listmonk",
+                  "gmb",
+                  "wrapcast",
+                  "nostr",
+                  "vk"
+                ]
+              }
+            }
+          },
+          {
+            "name": "sourcePostId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "timeline",
+              "enum": [
+                "templates",
+                "timeline"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "publishDate",
+              "enum": [
+                "publishDate",
+                "createdAt",
+                "updatedAt",
+                "state"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locate the page of a given postId within /posts/list using the same filters and sort. Returns null page when the post does not match the filters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "found": {
+                      "type": "boolean"
+                    },
+                    "page": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "total": {
+                      "type": "number"
+                    },
+                    "pageSize": {
+                      "type": "number"
+                    },
+                    "totalPages": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
     "/posts/old": {
       "get": {
         "operationId": "PostsController_oldPosts",
@@ -5510,7 +5691,7 @@
           "repeatPassword": {
             "type": "string",
             "enum": [
-              "EPxI5ylEpi"
+              "K4rhAEnM3t"
             ]
           },
           "token": {
@@ -6551,6 +6732,137 @@
             ]
           }
         }
+      },
+      "LocatePostInListDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "description": "Post id whose page within /posts/list to locate"
+          },
+          "pageSize": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUE",
+              "PUBLISHED",
+              "ERROR",
+              "DRAFT"
+            ]
+          },
+          "integrationId": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "channel": {
+            "type": "array",
+            "enum": [
+              "x",
+              "reddit",
+              "linkedin",
+              "linkedin-page",
+              "instagram",
+              "instagram-standalone",
+              "facebook",
+              "youtube",
+              "tiktok",
+              "pinterest",
+              "threads",
+              "mastodon",
+              "bluesky",
+              "medium",
+              "devto",
+              "hashnode",
+              "wordpress",
+              "discord",
+              "slack",
+              "telegram",
+              "dribbble",
+              "kick",
+              "twitch",
+              "lemmy",
+              "listmonk",
+              "gmb",
+              "wrapcast",
+              "nostr",
+              "vk"
+            ],
+            "description": "Filter by provider type (e.g. x, reddit, linkedin)",
+            "items": {
+              "type": "string",
+              "enum": [
+                "x",
+                "reddit",
+                "linkedin",
+                "linkedin-page",
+                "instagram",
+                "instagram-standalone",
+                "facebook",
+                "youtube",
+                "tiktok",
+                "pinterest",
+                "threads",
+                "mastodon",
+                "bluesky",
+                "medium",
+                "devto",
+                "hashnode",
+                "wordpress",
+                "discord",
+                "slack",
+                "telegram",
+                "dribbble",
+                "kick",
+                "twitch",
+                "lemmy",
+                "listmonk",
+                "gmb",
+                "wrapcast",
+                "nostr",
+                "vk"
+              ]
+            }
+          },
+          "sourcePostId": {
+            "type": "string"
+          },
+          "view": {
+            "type": "string",
+            "default": "timeline",
+            "enum": [
+              "templates",
+              "timeline"
+            ]
+          },
+          "sortBy": {
+            "type": "string",
+            "default": "publishDate",
+            "enum": [
+              "publishDate",
+              "createdAt",
+              "updatedAt",
+              "state"
+            ]
+          },
+          "sortOrder": {
+            "type": "string",
+            "default": "desc",
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        },
+        "required": [
+          "postId"
+        ]
       }
     }
   },

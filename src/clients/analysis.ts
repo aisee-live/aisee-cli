@@ -182,12 +182,13 @@ export const analysisClient = {
     }
   },
 
-  async getActions(url: string, options: { module?: string; page?: number; size?: number; status?: string } = {}) {
+  async getActions(url: string, options: { module?: string; has_solution?: boolean; page?: number; size?: number; status?: string } = {}) {
     const productId = getDomain(url);
     const response = await cx(analysisAxios.get(`/action`, {
       params: {
         task_id: productId,
         source_module: options.module,
+        has_solution: options.has_solution,
         page: options.page,
         size: options.size,
         status: options.status

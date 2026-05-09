@@ -3173,6 +3173,22 @@
               ],
               "title": "Source Module"
             }
+          },
+          {
+            "name": "has_solution_data",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Solution Data"
+            }
           }
         ],
         "responses": {

@@ -41,13 +41,20 @@ export const postCreateModule = {
       media,
     });
 
-    const fmtIdx = process.argv.indexOf("--format");
-    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
-    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
+    const effectiveFmt = getFmt();
+    const rows: Record<string, unknown>[] = Array.isArray(results) ? results : [results];
+
+    if (effectiveFmt === "markdown") {
+      const summaries = rows.map((r) => ({
+        "Post ID": r.postId ?? r.id ?? "",
+        State: r.state ?? r.status ?? "",
+        URL: r.releaseURL ?? "",
+      }));
+      return ["# Post Created", "", mdRecordTable(summaries)].join("\n") + "\n";
+    }
 
     if (effectiveFmt !== "table") return results;
 
-    const rows: Record<string, unknown>[] = Array.isArray(results) ? results : [results];
     return rows.map(r => {
       const lines: string[] = [
         `postId   ${r.postId ?? r.id ?? ""}`,
@@ -59,16 +66,49 @@ export const postCreateModule = {
   }
 };
 
-function summarizePost(p: Record<string, unknown>): Record<string, unknown> {
+function summarizePost(p: Record<string, unknown>, full: boolean): Record<string, unknown> {
   const content = String(p.content ?? p.text ?? p.message ?? "").trim();
   return {
     id: p.id,
     state: p.state ?? p.status,
     platform: (p.integration as any)?.identifier ?? p.platform ?? p.channel,
-    content: content.length > 60 ? content.slice(0, 57) + "..." : content,
+    content: full || content.length <= 60 ? content : content.slice(0, 57) + "...",
     scheduled: p.publishDate ?? p.scheduled_at ?? p.scheduleDate,
     created_at: p.createdAt ?? p.created_at,
   };
+}
+
+function escapeMdCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function mdKeyValueTable(obj: Record<string, unknown>): string {
+  const entries = Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "");
+  if (entries.length === 0) return "";
+  const lines = ["| Field | Value |", "|-------|-------|"];
+  for (const [k, v] of entries) {
+    lines.push(`| ${escapeMdCell(String(k))} | ${escapeMdCell(String(v))} |`);
+  }
+  return lines.join("\n");
+}
+
+function mdRecordTable(records: Record<string, unknown>[]): string {
+  if (records.length === 0) return "_No records._";
+  const keys = [...new Set(records.flatMap((r) => Object.keys(r)))];
+  const lines = [
+    "| " + keys.map((k) => escapeMdCell(k)).join(" | ") + " |",
+    "| " + keys.map(() => "---").join(" | ") + " |",
+  ];
+  for (const r of records) {
+    lines.push("| " + keys.map((k) => escapeMdCell(String(r[k] ?? ""))).join(" | ") + " |");
+  }
+  return lines.join("\n");
+}
+
+function getFmt(): string {
+  const fmtIdx = process.argv.indexOf("--format");
+  const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
+  return fmt ?? (process.stdout.isTTY ? "table" : "json");
 }
 
 export const postListModule = {
@@ -82,11 +122,12 @@ export const postListModule = {
   async execute(input: any) {
     const raw = await postAgentClient.listPosts({ state: input.state, pageSize: input.size, page: input.page });
 
-    const fmtIdx = process.argv.indexOf("--format");
-    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
-    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
+    const effectiveFmt = getFmt();
+    const isVerbose = process.argv.includes("--verbose");
+    const isPresentation = effectiveFmt === "table" || effectiveFmt === "markdown";
 
-    if (effectiveFmt !== "table") return raw;
+    // For machine-readable formats, --verbose returns the raw payload.
+    if (!isPresentation) return raw;
 
     const items: Record<string, unknown>[] = Array.isArray(raw?.results) ? raw.results : [];
     const pagination = {
@@ -96,9 +137,22 @@ export const postListModule = {
     };
 
     const header = `total: ${pagination.total}  page: ${pagination.page}  pages: ${pagination.pages}`;
-    if (items.length === 0) return `${header}\n\n(no posts)`;
+    if (items.length === 0) {
+      return effectiveFmt === "markdown"
+        ? `# Posts\n\n> ${header}\n\n_No posts._\n`
+        : `${header}\n\n(no posts)`;
+    }
 
-    const summaries = items.map(summarizePost);
+    const summaries = items.map((p) => summarizePost(p, isVerbose));
+
+    if (effectiveFmt === "markdown") {
+      const parts: string[] = [];
+      parts.push("# Posts", "");
+      parts.push(`> ${header}`, "");
+      parts.push(mdRecordTable(summaries));
+      return parts.join("\n") + "\n";
+    }
+
     const tables = summaries.map(s => formatKV(s)).join("\n\n");
     return `${header}\n\n${tables}`;
   }
@@ -127,9 +181,17 @@ export const channelListModule = {
       connected: !ch.disabled && !ch.refreshNeeded,
     }));
 
-    const fmtIdx = process.argv.indexOf("--format");
-    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
-    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
+    const effectiveFmt = getFmt();
+
+    if (effectiveFmt === "markdown") {
+      const rows = channels.map((c) => ({
+        ID: c.id,
+        Platform: c.platform,
+        Name: c.name,
+        Connected: c.connected ? "Yes" : "No",
+      }));
+      return ["# Channels", "", mdRecordTable(rows)].join("\n") + "\n";
+    }
 
     if (effectiveFmt === "table") return formatChannelTable(channels);
     return channels;
@@ -168,15 +230,15 @@ export const channelRemoveModule = {
     const data = await postAgentClient.removeChannel(input.id) as Record<string, unknown>;
     const success = data?.deletedAt != null;
 
-    const fmtIdx = process.argv.indexOf("--format");
-    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
-    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
+    const effectiveFmt = getFmt();
+    const message = success
+      ? `Channel '${data.name ?? input.id}' removed successfully.`
+      : `Failed to remove channel '${input.id}'.`;
 
-    if (effectiveFmt === "table") {
-      return success
-        ? `Channel '${data.name ?? input.id}' removed successfully.`
-        : `Failed to remove channel '${input.id}'.`;
+    if (effectiveFmt === "markdown") {
+      return `# Channel Remove\n\n${message}\n`;
     }
+    if (effectiveFmt === "table") return message;
 
     return { success };
   }
@@ -208,11 +270,8 @@ export const postDashboardModule = {
   async execute(input: any) {
     const data = await postAgentClient.getDashboard(input.period);
 
-    const fmtIdx = process.argv.indexOf("--format");
-    const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
-    const effectiveFmt = fmt ?? (process.stdout.isTTY ? "table" : "json");
-
-    if (effectiveFmt !== "table") return data;
+    const effectiveFmt = getFmt();
+    if (effectiveFmt !== "table" && effectiveFmt !== "markdown") return data;
 
     const stats = (data.posts_stats ?? {}) as Record<string, unknown>;
     const platforms = Array.isArray(data.channels_by_platform) ? data.channels_by_platform as Record<string, unknown>[] : [];
@@ -226,6 +285,17 @@ export const postDashboardModule = {
     };
     if (data.post_send_limit != null) overview.post_send_limit = data.post_send_limit;
     if (data.period_end != null) overview.period_end = data.period_end;
+
+    if (effectiveFmt === "markdown") {
+      const parts: string[] = [];
+      parts.push(`# Dashboard — ${input.period}`, "");
+      parts.push("## Overview", "", mdKeyValueTable(overview), "");
+      if (Object.keys(stats).length > 0) {
+        parts.push("## Post Stats", "", mdKeyValueTable(stats), "");
+      }
+      parts.push("## Channels by Platform", "", mdRecordTable(platforms), "");
+      return parts.join("\n").replace(/\n+$/, "") + "\n";
+    }
 
     const parts: string[] = [
       "=== Overview ===",

@@ -57,6 +57,21 @@ function withPositionals(cmd: Command, ...optionNames: string[]): Command {
   return cmd;
 }
 
+/**
+ * Extend the --format option's `choices` to include "markdown".
+ * apcore-cli's buildModuleCommand restricts --format to a fixed set; we
+ * inject "markdown" so every aisee command can render results via apcore-toolkit.
+ */
+function withMarkdownFormat(cmd: Command): Command {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fmtOpt = cmd.options.find((o: any) => o.long === "--format") as any;
+  if (fmtOpt && Array.isArray(fmtOpt.argChoices) && !fmtOpt.argChoices.includes("markdown")) {
+    fmtOpt.argChoices = [...fmtOpt.argChoices, "markdown"];
+    fmtOpt.description = "Output format: json, table, csv, yaml, jsonl, markdown.";
+  }
+  return cmd;
+}
+
 function makeDescriptor(moduleId: string, mod: AiseeModule): ModuleDescriptor {
   return {
     id: moduleId,
@@ -66,6 +81,16 @@ function makeDescriptor(moduleId: string, mod: AiseeModule): ModuleDescriptor {
     inputSchema: mod.inputSchema ? zodToJsonSchema(mod.inputSchema) : {},
     outputSchema: {},
   };
+}
+
+function buildAiseeCommand(
+  descriptor: ModuleDescriptor,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  executor: any,
+  helpTextMaxLength: number,
+  cmdName: string,
+): Command {
+  return withMarkdownFormat(buildModuleCommand(descriptor, executor, helpTextMaxLength, cmdName));
 }
 
 async function main() {
@@ -116,74 +141,74 @@ async function main() {
   // Top-level commands  — scan/report take <url> positionally
   // scan uses 900s to exceed the internal 600s scanAndWait timeout
   program.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("scan", scanModule), executor, 900, "scan"),
+    buildAiseeCommand(makeDescriptor("scan", scanModule), executor, 900, "scan"),
     "url",
   ));
   program.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("report", reportModule), executor, 1000, "report"),
+    buildAiseeCommand(makeDescriptor("report", reportModule), executor, 1000, "report"),
     "url",
   ));
 
   // auth — promoted to top-level per product spec
-  program.addCommand(buildModuleCommand(makeDescriptor("auth.login", loginModule), executor, 1000, "login"));
-  program.addCommand(buildModuleCommand(makeDescriptor("auth.logout", logoutModule), executor, 1000, "logout"));
-  program.addCommand(buildModuleCommand(makeDescriptor("auth.whoami", whoamiModule), executor, 1000, "whoami"));
+  program.addCommand(buildAiseeCommand(makeDescriptor("auth.login", loginModule), executor, 1000, "login"));
+  program.addCommand(buildAiseeCommand(makeDescriptor("auth.logout", logoutModule), executor, 1000, "logout"));
+  program.addCommand(buildAiseeCommand(makeDescriptor("auth.whoami", whoamiModule), executor, 1000, "whoami"));
 
   // actions <url> — standalone list command, no subcommands
   program.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("actions.list", actionsListModule), executor, 1000, "actions"),
+    buildAiseeCommand(makeDescriptor("actions.list", actionsListModule), executor, 1000, "actions"),
     "url",
   ));
 
   // action-suggest <actionId> — top-level to avoid argv[2] ambiguity with subcommand names
   program.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "action-suggest"),
+    buildAiseeCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "action-suggest"),
     "action_id",
   ));
 
   // action-post <actionId>
   program.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("actions.post", actionsPostModule), executor, 1000, "action-post"),
+    buildAiseeCommand(makeDescriptor("actions.post", actionsPostModule), executor, 1000, "action-post"),
     "action_id",
   ));
 
   // post — publish takes <id>, schedule takes <id> <time>
   const post = program.command("post").description("Social media post commands");
-  post.addCommand(buildModuleCommand(makeDescriptor("post.create", postCreateModule), executor, 1000, "create"));
-  post.addCommand(buildModuleCommand(makeDescriptor("post.list", postListModule), executor, 1000, "list"));
-  post.addCommand(buildModuleCommand(makeDescriptor("post.dashboard", postDashboardModule), executor, 1000, "dashboard"));
+  post.addCommand(buildAiseeCommand(makeDescriptor("post.create", postCreateModule), executor, 1000, "create"));
+  post.addCommand(buildAiseeCommand(makeDescriptor("post.list", postListModule), executor, 1000, "list"));
+  post.addCommand(buildAiseeCommand(makeDescriptor("post.dashboard", postDashboardModule), executor, 1000, "dashboard"));
   post.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("post.publish", postPublishModule), executor, 1000, "publish"),
+    buildAiseeCommand(makeDescriptor("post.publish", postPublishModule), executor, 1000, "publish"),
     "id",
   ));
   post.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("post.schedule", postScheduleModule), executor, 1000, "schedule"),
+    buildAiseeCommand(makeDescriptor("post.schedule", postScheduleModule), executor, 1000, "schedule"),
     "id",
     "time",
   ));
 
   // channels — add takes <platform>, remove takes <id>
   const channels = program.command("channels").description("Integration channels");
-  channels.addCommand(buildModuleCommand(makeDescriptor("channels.list", channelListModule), executor, 1000, "list"));
+  channels.addCommand(buildAiseeCommand(makeDescriptor("channels.list", channelListModule), executor, 1000, "list"));
   channels.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("channels.add", channelAddModule), executor, 1000, "add"),
+    buildAiseeCommand(makeDescriptor("channels.add", channelAddModule), executor, 1000, "add"),
     "platform",
   ));
   channels.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("channels.remove", channelRemoveModule), executor, 1000, "remove"),
+    buildAiseeCommand(makeDescriptor("channels.remove", channelRemoveModule), executor, 1000, "remove"),
     "id",
   ));
 
   // config
   const conf = program.command("config").description("CLI configuration");
-  conf.addCommand(buildModuleCommand(makeDescriptor("config.list", configListModule), executor, 1000, "list"));
+  conf.addCommand(buildAiseeCommand(makeDescriptor("config.list", configListModule), executor, 1000, "list"));
   conf.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("config.set", configSetModule), executor, 1000, "set"),
+    buildAiseeCommand(makeDescriptor("config.set", configSetModule), executor, 1000, "set"),
     "key",
     "value",
   ));
   conf.addCommand(withPositionals(
-    buildModuleCommand(makeDescriptor("config.spec", configSpecModule), executor, 1000, "spec"),
+    buildAiseeCommand(makeDescriptor("config.spec", configSpecModule), executor, 1000, "spec"),
     "service",
   ));
 

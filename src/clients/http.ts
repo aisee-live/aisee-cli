@@ -23,9 +23,9 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
   instance.interceptors.request.use(async (config) => {
     const settings = await loadSettings();
     const creds = await loadCredentials();
-    
+
     config.baseURL = settings[serviceType];
-    
+
     if (creds?.accessToken) {
       config.headers.Authorization = `Bearer ${creds.accessToken}`;
     }
@@ -33,7 +33,19 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
 
     if (isDebug()) {
       const fullUrl = `${config.baseURL ?? ""}${config.url ?? ""}`;
-      const params = config.params ? ` ?${new URLSearchParams(config.params).toString()}` : "";
+      // URLSearchParams stringifies null/undefined to literal "null"/"undefined";
+      // axios drops these on the wire, so strip them here too to keep the debug
+      // log honest about what was actually sent.
+      const cleaned = config.params
+        ? Object.fromEntries(
+          Object.entries(config.params as Record<string, unknown>).filter(
+            ([, v]) => v !== undefined && v !== null,
+          ),
+        )
+        : undefined;
+      const params = cleaned && Object.keys(cleaned).length
+        ? `?${new URLSearchParams(cleaned as Record<string, string>).toString()}`
+        : "";
       process.stderr.write(`[debug] [API] ${config.method?.toUpperCase() ?? "GET"} ${fullUrl}${params}\n`);
     }
 
@@ -89,7 +101,7 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
           }
 
           const result = await authClient.getAccessToken(creds.refreshToken);
-          
+
           await saveCredentials({
             ...creds,
             accessToken: result.access_token,

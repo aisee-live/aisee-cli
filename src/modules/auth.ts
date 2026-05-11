@@ -52,46 +52,78 @@ export const loginModule = {
     const spinner = ora("Waiting for authorization...").start();
 
     return new Promise((resolve, reject) => {
-      const interval = (deviceResp.interval || 5) * 1000;
+      let currentInterval = (deviceResp.interval || 5) * 1000;
+      let pollTimer: Timer | null = null;
       
       const timeoutTimer = setTimeout(() => {
-        clearInterval(pollTimer);
+        if (pollTimer) clearInterval(pollTimer);
         spinner.fail("Login timed out");
         reject(new Error("Device code expired. Please try again."));
       }, (deviceResp.expires_in || 300) * 1000);
 
-      const pollTimer = setInterval(async () => {
-        try {
-          const result = await authClient.pollToken(deviceResp.device_code);
+      const startPolling = () => {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(async () => {
+          try {
+            const result = await authClient.pollToken(deviceResp.device_code);
+            spinner.text = "Waiting for authorization...";
 
-          if (result !== "pending") {
-            clearInterval(pollTimer);
-            clearTimeout(timeoutTimer);
-            spinner.succeed("Login successful!");
+            if (result === "slow_down") {
+              // RFC 8628: increase interval by 5 seconds
+              currentInterval += 5000;
+              startPolling();
+              return;
+            }
 
-            await saveCredentials({
-              userId: result.user.id,
-              accessToken: result.access_token,
-              refreshToken: result.refresh_token,
-              email: result.user.email,
-              plan: "Pro", 
-              credits: 0    
-            });
+            if (result !== "pending") {
+              clearInterval(pollTimer!);
+              clearTimeout(timeoutTimer);
 
-            resolve({
-              message: `Successfully logged in as ${result.user.email}`,
-              id: result.user.id,
-              email: result.user.email,
-              username: result.user.username ?? null,
-            });
+              try {
+                await saveCredentials({
+                  userId: result.user.id,
+                  accessToken: result.access_token,
+                  refreshToken: result.refresh_token,
+                  email: result.user.email,
+                  plan: "Pro",
+                  credits: 0
+                });
+
+                spinner.succeed("Login successful!");
+
+                resolve({
+                  message: `Successfully logged in as ${result.user.email}`,
+                  id: result.user.id,
+                  email: result.user.email,
+                  username: result.user.username ?? null,
+                });
+              } catch (saveErr: any) {
+                spinner.fail(`Login successful, but failed to save credentials locally: ${saveErr.message}`);
+                reject(saveErr);
+              }
+            }
+          } catch (err: any) {
+            const isTerminal = 
+              err.message === "Login session expired" || 
+              err.message === "Login access denied by user" ||
+              err.response?.status === 401 ||
+              err.response?.status === 403;
+
+            if (isTerminal) {
+              clearInterval(pollTimer!);
+              clearTimeout(timeoutTimer);
+              spinner.fail(err.message || "Login failed");
+              reject(err);
+            } else {
+              // Non-terminal error (network timeout, 5xx, etc.): 
+              // Update spinner text but keep polling
+              spinner.text = `Waiting for authorization... (polling encountered a temporary issue: ${err.message || "unknown error"})`;
+            }
           }
-        } catch (err) {
-          clearInterval(pollTimer);
-          clearTimeout(timeoutTimer);
-          spinner.fail("Login failed");
-          reject(err);
-        }
-      }, interval);
+        }, currentInterval);
+      };
+
+      startPolling();
     });
   }
 };

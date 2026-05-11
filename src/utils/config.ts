@@ -141,7 +141,7 @@ export async function saveSettings(settings: Partial<Settings>) {
 
 export async function saveCredentials(creds: Credentials) {
   await ensureConfigDir();
-  await writeFile(CREDENTIALS_FILE, JSON.stringify(creds, null, 2));
+  await writeFile(CREDENTIALS_FILE, JSON.stringify(creds, null, 2), { mode: 0o600 });
 }
 
 export async function loadCredentials(): Promise<Credentials | null> {
@@ -157,6 +157,8 @@ export async function loadCredentials(): Promise<Credentials | null> {
 
 export async function clearCredentials() {
   try {
-    await writeFile(CREDENTIALS_FILE, JSON.stringify({}));
-  } catch { }
+    await writeFile(CREDENTIALS_FILE, JSON.stringify({}), { mode: 0o600 });
+  } catch (error: any) {
+    console.warn(`${chalk.yellow("!")} Warning: Failed to clear local credentials: ${error.message}`);
+  }
 }

@@ -21,56 +21,83 @@ export interface TokenResponse {
   };
 }
 
+const handleTlsRetry = async (fn: () => Promise<any>): Promise<any> => {
+  try {
+    return await fn();
+  } catch (error: any) {
+    // Retry once: TLS session cache may not be warm on first cold connection
+    if (error.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" || error.code === "CERT_UNTRUSTED" || error.message?.includes("certificate")) {
+      return await fn();
+    }
+    throw error;
+  }
+};
+
 export const authClient = {
   async requestDeviceCode(clientId: string = "aisee-cli"): Promise<DeviceCodeResponse> {
     const { authApiUrl } = await loadSettings();
     const url = `${authApiUrl}/cli/auth/device-code`;
-    try {
+    return handleTlsRetry(async () => {
       const response = await axios.post(url, { client_id: clientId });
       return response.data;
-    } catch (error: any) {
-      // Retry once: TLS session cache may not be warm on first cold connection
-      if (error.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" || error.code === "CERT_UNTRUSTED" || error.message?.includes("certificate")) {
-        const response = await axios.post(url, { client_id: clientId });
-        return response.data;
-      }
-      throw error;
-    }
+    });
   },
 
-  async pollToken(deviceCode: string): Promise<TokenResponse | "pending"> {
+  async pollToken(deviceCode: string): Promise<TokenResponse | "pending" | "slow_down"> {
     try {
       const { authApiUrl } = await loadSettings();
-      const response = await axios.post(`${authApiUrl}/cli/auth/token`, {
-        device_code: deviceCode
+      const response = await handleTlsRetry(async () => {
+        return await axios.post(`${authApiUrl}/cli/auth/token`, {
+          device_code: deviceCode
+        });
       });
       
-      if (response.data.error === "authorization_pending") {
+      if (response.data?.error === "authorization_pending") {
+        return "pending";
+      }
+
+      return response.data;
+    } catch (error: any) {
+      const errorData = error.response?.data;
+      const errorCode = errorData?.error || errorData?.detail;
+
+      if (errorCode === "authorization_pending") {
         return "pending";
       }
       
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.data?.detail === "expired_token") {
+      if (errorCode === "slow_down") {
+        return "slow_down";
+      }
+
+      if (errorCode === "expired_token") {
         throw new Error("Login session expired");
       }
+      
+      if (errorCode === "access_denied") {
+        throw new Error("Login access denied by user");
+      }
+
       throw error;
     }
   },
 
   async refreshToken(refreshToken: string): Promise<TokenResponse> {
     const { authApiUrl } = await loadSettings();
-    const response = await axios.post(`${authApiUrl}/cli/auth/token-refresh`, {
-      refresh_token: refreshToken
+    return handleTlsRetry(async () => {
+      const response = await axios.post(`${authApiUrl}/cli/auth/token-refresh`, {
+        refresh_token: refreshToken
+      });
+      return response.data;
     });
-    return response.data;
   },
 
   async getAccessToken(refreshToken: string): Promise<Omit<TokenResponse, "refresh_token">> {
     const { authApiUrl } = await loadSettings();
-    const response = await axios.post(`${authApiUrl}/cli/auth/access-token`, {
-      refresh_token: refreshToken
+    return handleTlsRetry(async () => {
+      const response = await axios.post(`${authApiUrl}/cli/auth/access-token`, {
+        refresh_token: refreshToken
+      });
+      return response.data;
     });
-    return response.data;
   }
 };

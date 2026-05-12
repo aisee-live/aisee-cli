@@ -68,6 +68,7 @@ Retrieve the aggregated analysis report for a URL.
 
 ```bash
 aisee report https://example.com
+aisee report https://example.com --verbose          # show detailed per-model breakdown
 aisee report https://example.com --section ai-presence
 aisee report https://example.com --history          # list all historical versions
 aisee report https://example.com --ver 7.0          # fetch a specific version
@@ -80,6 +81,7 @@ aisee report https://example.com --format json --fields result.total_score
 | `--section <name>` | `summary` | `summary`, `ai-presence`, `competitor`, `strategy`, `seo`, `mentions` |
 | `--ver <v>` | — | Fetch a specific historical version |
 | `--history` | false | List all available historical versions |
+| `--verbose` | false | Show detailed per-model breakdown for AI Presence, Competitor Landscape, and Strategy Review |
 
 ---
 

@@ -103,14 +103,14 @@ aisee actions https://example.com --format json
 | `--sort-order <asc\|desc>` | `asc` | Sort direction |
 | `--status <s>` | — | Filter by status: `pending`, `in_progress`, `completed` |
 
-### `aisee action-suggest <actionId>`
+### `aisee action-suggest <action-id>`
 Get detailed AI-generated implementation suggestions for an action.
 
 ```bash
 aisee action-suggest abc-123
 ```
 
-### `aisee action-post <actionId>`
+### `aisee action-post <action-id>`
 Create social media posts from an action's implementation suggestions. Discovers target channels automatically from the product configuration.
 
 ```bash
@@ -119,7 +119,7 @@ aisee action-post abc-123
 
 | Flag | Default | Description |
 |---|---|---|
-| `<actionId>` | required | Action ID |
+| `<action-id>` | required | Action ID |
 
 ---
 

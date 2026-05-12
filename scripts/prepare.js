@@ -30,5 +30,7 @@ try {
   process.exit(0);
 }
 
+execSync("node scripts/patch-deps.js", { stdio: "inherit" });
+
 console.log(`prepare: building for ${key} (bun run ${script})`);
 execSync(`bun run ${script}`, { stdio: "inherit" });

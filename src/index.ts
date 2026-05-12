@@ -28,11 +28,11 @@ import { configListModule, configSetModule, configSpecModule } from "./modules/c
 import { zodToJsonSchema } from "./utils/zod-to-schema.ts";
 import { ExecutorAdapter } from "./utils/executor-adapter.ts";
 import { RegistryAdapter } from "./utils/registry-adapter.ts";
-import pkg from "../package.json" with { type: "json" };
+
+import pkg from "./package.json" with { type: "json" };
 
 interface AiseeModule {
   description: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   inputSchema?: any;
 }
 
@@ -58,18 +58,27 @@ function withPositionals(cmd: Command, ...optionNames: string[]): Command {
 }
 
 /**
- * Extend the --format option's `choices` to include "markdown".
+ * Extend the --format option's `choices` to include "tui" and "markdown".
  * apcore-cli's buildModuleCommand restricts --format to a fixed set; we
- * inject "markdown" so every aisee command can render results via apcore-toolkit.
+ * inject custom formats so every aisee command can render results via our adapter.
  */
-function withMarkdownFormat(cmd: Command): Command {
+function withEnhancedFormats(cmd: Command): Command {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fmtOpt = cmd.options.find((o: any) => o.long === "--format") as any;
-  if (fmtOpt && Array.isArray(fmtOpt.argChoices) && !fmtOpt.argChoices.includes("markdown")) {
-    fmtOpt.argChoices = [...fmtOpt.argChoices, "markdown"];
-    fmtOpt.description = "Output format: json, table, csv, yaml, jsonl, markdown.";
+  if (fmtOpt && Array.isArray(fmtOpt.argChoices)) {
+    const newChoices = ["tui", "markdown"];
+    newChoices.forEach(choice => {
+      if (!fmtOpt.argChoices.includes(choice)) {
+        fmtOpt.argChoices.push(choice);
+      }
+    });
+    fmtOpt.description = "Output format: tui, json, table, csv, yaml, jsonl, markdown.";
   }
   return cmd;
+}
+
+function withVerbose(cmd: Command): Command {
+  return cmd.option("--verbose", "Return raw API response instead of formatted output");
 }
 
 function makeDescriptor(moduleId: string, mod: AiseeModule): ModuleDescriptor {
@@ -90,7 +99,7 @@ function buildAiseeCommand(
   helpTextMaxLength: number,
   cmdName: string,
 ): Command {
-  return withMarkdownFormat(buildModuleCommand(descriptor, executor, helpTextMaxLength, cmdName));
+  return withEnhancedFormats(buildModuleCommand(descriptor, executor, helpTextMaxLength, cmdName));
 }
 
 async function main() {
@@ -145,7 +154,7 @@ async function main() {
     "url",
   ));
   program.addCommand(withPositionals(
-    buildAiseeCommand(makeDescriptor("report", reportModule), executor, 1000, "report"),
+    withVerbose(buildAiseeCommand(makeDescriptor("report", reportModule), executor, 1000, "report")),
     "url",
   ));
 
@@ -154,28 +163,26 @@ async function main() {
   program.addCommand(buildAiseeCommand(makeDescriptor("auth.logout", logoutModule), executor, 1000, "logout"));
   program.addCommand(buildAiseeCommand(makeDescriptor("auth.whoami", whoamiModule), executor, 1000, "whoami"));
 
-  // actions <url> — standalone list command, no subcommands
+  // actions <url> — list optimization tasks for a site
   program.addCommand(withPositionals(
-    buildAiseeCommand(makeDescriptor("actions.list", actionsListModule), executor, 1000, "actions"),
+    withVerbose(buildAiseeCommand(makeDescriptor("actions.list", actionsListModule), executor, 1000, "actions")),
     "url",
   ));
 
-  // action-suggest <actionId> — top-level to avoid argv[2] ambiguity with subcommand names
+  // action-suggest <action-id> / action-post <action-id> — top-level per docs/COMMANDS.md
   program.addCommand(withPositionals(
     buildAiseeCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "action-suggest"),
     "action_id",
   ));
-
-  // action-post <actionId>
   program.addCommand(withPositionals(
     buildAiseeCommand(makeDescriptor("actions.post", actionsPostModule), executor, 1000, "action-post"),
     "action_id",
   ));
 
-  // post — publish takes <id>, schedule takes <id> <time>
-  const post = program.command("post").description("Social media post commands");
+  // post
+  const post = program.command("post").description("Social post management");
   post.addCommand(buildAiseeCommand(makeDescriptor("post.create", postCreateModule), executor, 1000, "create"));
-  post.addCommand(buildAiseeCommand(makeDescriptor("post.list", postListModule), executor, 1000, "list"));
+  post.addCommand(withVerbose(buildAiseeCommand(makeDescriptor("post.list", postListModule), executor, 1000, "list")));
   post.addCommand(buildAiseeCommand(makeDescriptor("post.dashboard", postDashboardModule), executor, 1000, "dashboard"));
   post.addCommand(withPositionals(
     buildAiseeCommand(makeDescriptor("post.publish", postPublishModule), executor, 1000, "publish"),

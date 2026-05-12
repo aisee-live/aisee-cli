@@ -23,8 +23,7 @@
   ],
   "scripts": {
     "start": "bun run src/index.ts",
-    "patch-deps": "node scripts/patch-deps.js",
-    "build": "bun run patch-deps && bun run build:js && bun run build:bin",
+    "build": "bun run build:js && bun run build:bin",
     "build:js": "bun build ./src/index.ts --outfile ./bin/aisee.js --target node --define \"pkg.version='0.3.0'\" --define \"pkg.description='AISee CLI'\" --define \"VERSION2='0.3.0'\" --define \"VERSION='0.3.0'\" --define \"_pkg.version='0.3.0'\"",
     "build:bin": "bun build ./src/index.ts --compile --outfile ./bin/aisee --define \"pkg.version='0.3.0'\" --define \"pkg.description='AISee CLI'\" --define \"VERSION2='0.3.0'\" --define \"VERSION='0.3.0'\" --define \"_pkg.version='0.3.0'\"",
     "build:linux-x64": "bun build ./src/index.ts --compile --target=bun-linux-x64-modern --outfile dist/aisee-linux-x64 --define \"pkg.version='0.3.0'\" --define \"pkg.description='AISee CLI'\"",

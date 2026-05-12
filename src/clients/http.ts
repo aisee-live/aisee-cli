@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import https from "https";
 import { loadCredentials, saveCredentials, clearCredentials, loadSettings, Settings } from "../utils/config.ts";
 import { authClient } from "./auth.ts";
 import { isDebug } from "../utils/log-level.ts";
@@ -17,14 +18,23 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
+const createAxiosInstance = (serviceType: keyof Settings | "authApiUrl"): AxiosInstance => {
   const instance = axios.create({ timeout: 30000 });
 
   instance.interceptors.request.use(async (config) => {
     const settings = await loadSettings();
     const creds = await loadCredentials();
 
-    config.baseURL = settings[serviceType];
+    config.baseURL = settings[serviceType as keyof Settings];
+
+    if (settings.allowInsecure) {
+      config.httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    }
+
+    // For authApiUrl specifically (if it's not in the Settings interface but passed here)
+    if (serviceType === "authApiUrl") {
+      config.baseURL = settings.authApiUrl;
+    }
 
     if (creds?.accessToken) {
       config.headers.Authorization = `Bearer ${creds.accessToken}`;
@@ -33,9 +43,6 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
 
     if (isDebug()) {
       const fullUrl = `${config.baseURL ?? ""}${config.url ?? ""}`;
-      // URLSearchParams stringifies null/undefined to literal "null"/"undefined";
-      // axios drops these on the wire, so strip them here too to keep the debug
-      // log honest about what was actually sent.
       const cleaned = config.params
         ? Object.fromEntries(
           Object.entries(config.params as Record<string, unknown>).filter(
@@ -69,16 +76,32 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
       }
 
       // Retry once on intermittent TLS errors (cold connection / cert cache miss)
+      const errorMsg = String(error.message || "").toLowerCase();
       const isCertError =
         error.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
         error.code === "CERT_UNTRUSTED" ||
-        (typeof error.message === "string" && error.message.includes("certificate"));
+        error.code === "DEPTH_ZERO_SELF_SIGNED_CERT" ||
+        errorMsg.includes("certificate") ||
+        errorMsg.includes("tls") ||
+        errorMsg.includes("verification error");
+
       if (isCertError && !originalRequest._tlsRetry) {
+        const settings = await loadSettings();
+        if (settings.allowInsecure) {
+          // If we already allowed insecure, and it still fails, it's not a cert error we can bypass
+          return Promise.reject(error);
+        }
         originalRequest._tlsRetry = true;
         return instance(originalRequest);
       }
 
-      if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isCertError && originalRequest._tlsRetry) {
+        // Still failing after retry, add a helpful hint
+        error.message = `${error.message}. Hint: Try 'aisee config set allow_insecure true' if you trust this network.`;
+      }
+
+      // Token Refresh Logic (only for non-auth requests)
+      if (serviceType !== "authApiUrl" && error.response?.status === 401 && !originalRequest._retry) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
@@ -127,5 +150,6 @@ const createAxiosInstance = (serviceType: keyof Settings): AxiosInstance => {
   return instance;
 };
 
+export const authAxios = createAxiosInstance("authApiUrl");
 export const analysisAxios = createAxiosInstance("analysisApiUrl");
 export const postAgentAxios = createAxiosInstance("postAgentApiUrl");

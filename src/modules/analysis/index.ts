@@ -5,6 +5,8 @@ import { loadCredentials } from "../../utils/config.ts";
 import { productUrlSchema, normalizeProductUrl } from "../../utils/url.ts";
 import { UserError } from "../../utils/errors.ts";
 import { isDebug } from "../../utils/log-level.ts";
+import { getOutputFormat, isPresentationFormat } from "../../utils/format.ts";
+import { renderMarkdownToTui } from "../../utils/tui.ts";
 
 function dbg(msg: string, data?: unknown): void {
   if (!isDebug()) return;
@@ -525,7 +527,6 @@ function buildReportMarkdown(record: Record<string, unknown>, section: string, v
       parts.push("_Score not available._", "");
     }
 
-    parts.push(`## About ${brandName}`, "");
     if (description) parts.push(description, "");
 
     const aboutMeta: Record<string, unknown> = {
@@ -547,7 +548,7 @@ function buildReportMarkdown(record: Record<string, unknown>, section: string, v
     const platformScores = platformBreakdown(aiPresenceData, "code_ai_presence_analyzer_");
 
     parts.push(`## AI Presence${aiPresenceTotal !== null ? ` — ${aiPresenceTotal.toFixed(1)}` : ""}`, "");
-    parts.push("Tests how well major AI platforms recognize and understand your brand.", "");
+    parts.push("Tests how well major AI platforms recognize and understand your brand", "");
     if (Object.keys(platformScores).length > 0) {
       const rows = Object.entries(platformScores)
         .sort((a, b) => a[0].localeCompare(b[0]))
@@ -561,7 +562,7 @@ function buildReportMarkdown(record: Record<string, unknown>, section: string, v
     const competitorTotal = typeof competitorResult?.total_score === "number" ? competitorResult.total_score as number : null;
 
     parts.push(`## Competitor Landscape${competitorTotal !== null ? ` — ${competitorTotal.toFixed(1)}` : ""}`, "");
-    parts.push("Tracks which competitors appear with your brand in AI queries and evaluates competitive visibility.", "");
+    parts.push("Tracks which competitors appear with your brand in AI queries and evaluates your competitive visibility", "");
     const competitorBreakdown = competitorResult?.score_breakdown as Record<string, number> | undefined;
     if (competitorBreakdown && Object.keys(competitorBreakdown).length > 0) {
       const bd: Record<string, unknown> = {};
@@ -586,7 +587,7 @@ function buildReportMarkdown(record: Record<string, unknown>, section: string, v
     const strategyTotal = typeof strategyResult?.total_score === "number" ? strategyResult.total_score as number : null;
 
     parts.push(`## Strategy Review${strategyTotal !== null ? ` — ${strategyTotal.toFixed(1)}` : ""}`, "");
-    parts.push("Comprehensive assessment of website AI-friendliness across content, structure, and accessibility.", "");
+    parts.push("Comprehensive assessment of your website's AI-friendliness across content, structure, and accessibility", "");
     const strategyBreakdown = strategyResult?.score_breakdown as Record<string, number> | undefined;
     if (strategyBreakdown && Object.keys(strategyBreakdown).length > 0) {
       const bd: Record<string, unknown> = {};
@@ -594,22 +595,6 @@ function buildReportMarkdown(record: Record<string, unknown>, section: string, v
         bd[STRATEGY_LABELS[k] ?? k] = formatScoreNumber(v);
       }
       parts.push(mdKeyValueTable(bd), "");
-    }
-
-    // Top-level summary lines & recommendations from aggregate
-    const summary = agg?.summary as string[] | string | undefined;
-    if (summary) {
-      const summLines = (Array.isArray(summary) ? summary : [summary]).filter(Boolean);
-      const unique = [...new Set(summLines)];
-      if (unique.length > 0) {
-        parts.push("## Summary", "", mdBulletList(unique), "");
-      }
-    }
-
-    const recs = agg?.recommendations as string[] | undefined;
-    if (Array.isArray(recs) && recs.length > 0) {
-      const unique = [...new Set(recs)];
-      parts.push("## Recommendations", "", mdNumberedList(unique), "");
     }
 
     // Verbose mode: append per-model details and full strategy breakdown
@@ -721,6 +706,18 @@ function summarizeHistoryRecord(record: Record<string, unknown>): Record<string,
   };
 }
 
+function getEffectiveFormat(): string {
+  return getOutputFormat();
+}
+
+/**
+ * Check if the format is one of the presentation formats (tui, table, markdown).
+ * Used to decide if --verbose should return raw data or the rendered view.
+ */
+function isModulePresentationFormat(fmt: string): boolean {
+  return fmt === "table" || fmt === "markdown" || fmt === "tui";
+}
+
 export const scanModule = {
   description: "Start AEO analysis for a product with complete task orchestration",
   inputSchema: z.object({
@@ -758,6 +755,7 @@ export const scanModule = {
         if (fmt === "markdown") {
           return ["# Scan Submitted", "", mdKeyValueTable(flat)].join("\n") + "\n";
         }
+        if (fmt === "tui") return flat;
         return flat;
       }
       return data;
@@ -825,6 +823,7 @@ export const scanModule = {
 
     const fmt = getEffectiveFormat();
     if (fmt === "markdown") return formatScanResultMarkdown(result as Record<string, unknown>, input.url);
+    if (fmt === "tui") return result;
     if (fmt !== "table") return result;
     return formatScanResult(result as Record<string, unknown>);
   }
@@ -947,7 +946,7 @@ export const reportModule = {
       const effectiveFmt = getEffectiveFormat();
       // --verbose returns raw data only for machine-readable formats; markdown/table
       // are presentation formats and should always go through the formatter.
-      if (isVerbose && !isPresentationFormat(effectiveFmt)) return raw;
+      if (isVerbose && !isModulePresentationFormat(effectiveFmt)) return raw;
 
       const page = raw as { items?: Record<string, unknown>[]; total?: number; page?: number; size?: number; pages?: number };
       const records: Record<string, unknown>[] = Array.isArray(raw)
@@ -995,15 +994,20 @@ export const reportModule = {
     });
 
     const effectiveFmt = getEffectiveFormat();
-    if (isVerbose && !isPresentationFormat(effectiveFmt)) return raw;
+    if (isVerbose && !isModulePresentationFormat(effectiveFmt)) return raw;
 
-    if (effectiveFmt === "markdown" && raw && typeof raw === "object" && "result" in (raw as object)) {
-      return buildReportMarkdown(raw as Record<string, unknown>, section, isVerbose);
+    if (raw && typeof raw === "object" && "result" in (raw as object)) {
+      if (effectiveFmt === "markdown") {
+        return buildReportMarkdown(raw as Record<string, unknown>, section, isVerbose);
+      }
+      if (effectiveFmt === "tui") {
+        return renderMarkdownToTui(buildReportMarkdown(raw as Record<string, unknown>, section, isVerbose));
+      }
+      if (effectiveFmt === "table") {
+        return summarizeReport(raw as Record<string, unknown>, section);
+      }
     }
 
-    if (effectiveFmt === "table" && raw && typeof raw === "object" && "result" in (raw as object)) {
-      return summarizeReport(raw as Record<string, unknown>, section);
-    }
     return raw;
   }
 };
@@ -1021,7 +1025,7 @@ function summarizeAction(item: Record<string, unknown>): Record<string, unknown>
     expected_score: item.expected_score,
     status: item.status,
   };
-  if (item.description) out.description = String(item.description).slice(0, 80);
+  if (item.description) out.description = String(item.description).slice(0, 120);
 
   const solutions = item.solution_data;
   if (Array.isArray(solutions) && solutions.length > 0) {
@@ -1051,10 +1055,18 @@ export const actionsListModule = {
     const raw = await analysisClient.getActions(input.url, input);
 
     const effectiveFmt = getEffectiveFormat();
-    if (process.argv.includes("--verbose") && !isPresentationFormat(effectiveFmt)) return raw;
+    if (process.argv.includes("--verbose") && !isModulePresentationFormat(effectiveFmt)) return raw;
 
     const page = raw as { items?: Record<string, unknown>[]; total?: number; page?: number; pages?: number };
     const items: Record<string, unknown>[] = Array.isArray(page?.items) ? page.items : [];
+
+    if (effectiveFmt === "tui") {
+      return {
+        total: page.total ?? items.length,
+        items: items.map(summarizeAction)
+      };
+    }
+
     const summaries = items.map(summarizeAction);
 
     if (effectiveFmt === "csv") return summaries;
@@ -1144,19 +1156,6 @@ function buildActionsMarkdown(
   });
 
   return parts.join("\n").replace(/\n+$/, "") + "\n";
-}
-
-function getEffectiveFormat(): string {
-  const fmtIdx = process.argv.indexOf("--format");
-  const fmt = fmtIdx !== -1 ? process.argv[fmtIdx + 1] : null;
-  return fmt ?? (process.stdout.isTTY ? "table" : "json");
-}
-
-// Presentation formats render summarized/styled output. With these formats,
-// `--verbose` should NOT short-circuit to raw data — the user explicitly asked
-// for a rendered view.
-function isPresentationFormat(fmt: string): boolean {
-  return fmt === "table" || fmt === "markdown";
 }
 
 type TaskItem = {
@@ -1396,6 +1395,8 @@ export const actionsPostModule = {
       parts.push(mdRecordTable(rows));
       return parts.join("\n") + "\n";
     }
+
+    if (effectiveFmt === "tui") return postResults;
 
     if (effectiveFmt !== "table") return postResults;
 

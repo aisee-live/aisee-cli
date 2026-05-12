@@ -7,13 +7,24 @@
 import type { Executor, PipelineTrace } from "apcore-cli";
 import type { Executor as ApCoreExecutor } from "apcore-js";
 import { UserError } from "./errors.ts";
+import {
+  colors,
+  renderKV,
+  renderProgressBar,
+  renderGrade,
+  renderSectionHeader,
+  renderActionCard,
+  renderRecordCard,
+  renderRule,
+  getTerminalWidth,
+} from "./tui.ts";
+import { getOutputFormat } from "./format.ts";
 
 function rethrowUserError(err: unknown): never {
   if (err instanceof UserError) {
     process.stderr.write(`Error: ${err.message}\n`);
     process.exit(1);
   }
-  // apcore-js wraps module errors as MODULE_EXECUTE_ERROR; reason lives in details.reason
   const record = err as Record<string, unknown>;
   if (record?.code === "MODULE_EXECUTE_ERROR") {
     const details = record?.details as Record<string, unknown> | undefined;
@@ -25,11 +36,6 @@ function rethrowUserError(err: unknown): never {
     }
   }
   throw err;
-}
-
-function isMarkdownFormat(): boolean {
-  const idx = process.argv.indexOf("--format");
-  return idx !== -1 && process.argv[idx + 1] === "markdown";
 }
 
 function escapeMdCell(text: string): string {
@@ -75,18 +81,170 @@ function renderArrayMarkdown(arr: unknown[]): string {
   return arr.map((v) => `- ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join("\n") + "\n";
 }
 
-/**
- * If --format markdown is set and a module returned a non-string value, render
- * it generically as markdown so apcore-cli's formatExecResult doesn't fall
- * through to JSON.stringify. Modules that build their own markdown string
- * already return a string and bypass this layer.
- */
-function maybeRenderMarkdown(result: unknown): unknown {
-  if (!isMarkdownFormat()) return result;
-  if (result === null || result === undefined) return result;
-  if (typeof result === "string") return result;
-  if (Array.isArray(result)) return renderArrayMarkdown(result);
-  if (typeof result === "object") return renderObjectMarkdown(result as Record<string, unknown>);
+function renderPlain(result: any, prefix: string = ""): string {
+  if (result === null || result === undefined) return "";
+  if (typeof result !== "object") return `${prefix}${result}\n`;
+
+  let output = "";
+  for (const [key, value] of Object.entries(result)) {
+    if (Array.isArray(value)) {
+      output += `${prefix}${key}:\n`;
+      value.forEach(item => {
+        output += renderPlain(item, `${prefix}  - `);
+      });
+    } else if (typeof value === "object" && value !== null) {
+      output += `${prefix}${key}:\n`;
+      output += renderPlain(value, `${prefix}  `);
+    } else {
+      output += `${prefix}${key}: ${value}\n`;
+    }
+  }
+  return output;
+}
+
+function isActionItem(item: unknown): item is Record<string, any> {
+  if (!item || typeof item !== "object") return false;
+  const i = item as Record<string, unknown>;
+  return Boolean(i.title) && (i.difficulty !== undefined || i.impact !== undefined);
+}
+
+function findItemsArray(result: Record<string, any>): { key: string; items: any[] } | null {
+  for (const [k, v] of Object.entries(result)) {
+    if (Array.isArray(v) && v.length > 0 && v.every((x) => x !== null && typeof x === "object")) {
+      return { key: k, items: v };
+    }
+  }
+  return null;
+}
+
+function renderListHeader(moduleId: string, result: Record<string, any>, itemCount: number): string {
+  const name = moduleId.split(".").pop() || moduleId;
+  const stats: string[] = [];
+  if (typeof result.total === "number") stats.push(`${colors.white.bold(String(result.total))} ${colors.dim("total")}`);
+  else stats.push(`${colors.white.bold(String(itemCount))} ${colors.dim("items")}`);
+  if (typeof result.page === "number" && typeof result.pages === "number") {
+    stats.push(`${colors.dim("page")} ${colors.white(String(result.page))}${colors.dim("/")}${colors.white(String(result.pages))}`);
+  }
+  const left = renderSectionHeader(moduleId, name.toUpperCase());
+  return `${left}  ${colors.dim("·")}  ${stats.join(`  ${colors.dim("·")}  `)}`;
+}
+
+function renderListResult(moduleId: string, result: Record<string, any>, items: any[]): string {
+  const width = getTerminalWidth();
+  const out: string[] = [];
+  out.push("");
+  out.push(renderListHeader(moduleId, result, items.length));
+  out.push(renderRule(width));
+
+  const allHaveModule = items.every((i) => typeof i.module === "string" && i.module);
+  const renderItem = (item: Record<string, any>) =>
+    isActionItem(item) ? renderActionCard(item, width) : renderRecordCard(item, width);
+
+  if (allHaveModule) {
+    const groups = new Map<string, Record<string, any>[]>();
+    for (const it of items) {
+      const key = String(it.module);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(it);
+    }
+    let first = true;
+    for (const [module, groupItems] of groups) {
+      if (!first) out.push("");
+      first = false;
+      out.push(colors.lime.bold(module.toUpperCase()) + colors.dim(`  (${groupItems.length})`));
+      out.push("");
+      groupItems.forEach((it, idx) => {
+        out.push(renderItem(it));
+        if (idx < groupItems.length - 1) out.push("");
+      });
+    }
+  } else {
+    items.forEach((it, idx) => {
+      out.push(renderItem(it));
+      if (idx < items.length - 1) out.push("");
+    });
+  }
+
+  out.push(renderRule(width));
+  out.push("");
+  return out.join("\n");
+}
+
+function renderObjectResult(moduleId: string, result: Record<string, any>): string {
+  const width = getTerminalWidth();
+  const name = moduleId.split(".").pop() || moduleId;
+  const lines: string[] = [];
+  lines.push("");
+  lines.push(renderSectionHeader(moduleId, name.toUpperCase()));
+  lines.push(renderRule(width));
+
+  for (const [key, value] of Object.entries(result)) {
+    if (value === null || value === undefined) continue;
+    if (key.toLowerCase().includes("score") && typeof value === "number") {
+      lines.push(
+        `${renderKV(key, value.toFixed(2))}  ${renderProgressBar(value)} ${renderGrade(
+          value >= 80 ? "A" : value >= 60 ? "B" : "C",
+        )}`,
+      );
+    } else if (Array.isArray(value)) {
+      lines.push("");
+      lines.push(colors.white.bold(key.toUpperCase()) + colors.dim(`  (${value.length})`));
+      value.forEach((item, idx) => {
+        if (item !== null && typeof item === "object") {
+          lines.push(
+            isActionItem(item)
+              ? renderActionCard(item as Record<string, any>, width)
+              : renderRecordCard(item as Record<string, any>, width),
+          );
+          if (idx < value.length - 1) lines.push("");
+        } else {
+          lines.push(colors.dim(`  - ${item}`));
+        }
+      });
+    } else if (typeof value === "object") {
+      lines.push("");
+      lines.push(colors.white.bold(key.toUpperCase()));
+      lines.push(renderRecordCard(value as Record<string, any>, width));
+    } else {
+      lines.push(renderKV(key, String(value)));
+    }
+  }
+  lines.push(renderRule(width));
+  lines.push("");
+  return lines.join("\n");
+}
+
+function renderTui(moduleId: string, result: any): string {
+  if (result === null || result === undefined) return "";
+  if (typeof result !== "object") return String(result);
+
+  if (Array.isArray(result)) {
+    if (result.length === 0) return colors.dim("(empty)\n");
+    return renderListResult(moduleId, { total: result.length }, result);
+  }
+
+  const itemsField = findItemsArray(result);
+  if (itemsField && (typeof result.total === "number" || itemsField.items.length > 1)) {
+    return renderListResult(moduleId, result, itemsField.items);
+  }
+  return renderObjectResult(moduleId, result);
+}
+
+function maybeRenderEnhanced(moduleId: string, result: unknown): unknown {
+  const format = getOutputFormat();
+  
+  if (format === "tui") {
+    if (typeof result === "string") return result;
+    return renderTui(moduleId, result);
+  }
+
+  if (format === "markdown") {
+    if (result === null || result === undefined) return result;
+    if (typeof result === "string") return result;
+    if (Array.isArray(result)) return renderArrayMarkdown(result);
+    if (typeof result === "object") return renderObjectMarkdown(result as Record<string, unknown>);
+  }
+
   return result;
 }
 
@@ -95,12 +253,12 @@ export class ExecutorAdapter implements Executor {
 
   async execute(moduleId: string, input: Record<string, unknown>): Promise<unknown> {
     const result = await this.inner.call(moduleId, input).catch(rethrowUserError);
-    return maybeRenderMarkdown(result);
+    return maybeRenderEnhanced(moduleId, result);
   }
 
   async call(moduleId: string, input: Record<string, unknown>): Promise<unknown> {
     const result = await this.inner.call(moduleId, input).catch(rethrowUserError);
-    return maybeRenderMarkdown(result);
+    return maybeRenderEnhanced(moduleId, result);
   }
 
   async validate(moduleId: string, input: Record<string, unknown>) {
@@ -112,10 +270,8 @@ export class ExecutorAdapter implements Executor {
     input: Record<string, unknown>,
     _options?: { strategy?: string },
   ): Promise<[unknown, PipelineTrace]> {
-    // Strategy-by-name selection requires apcore-js strategy registry access
-    // which is not yet bridged — executor uses its currently-configured strategy.
     const result = (await this.inner.callWithTrace(moduleId, input)) as [unknown, PipelineTrace];
-    return [maybeRenderMarkdown(result[0]), result[1]];
+    return [maybeRenderEnhanced(moduleId, result[0]), result[1]];
   }
 
   stream(moduleId: string, input: Record<string, unknown>): AsyncIterable<unknown> {

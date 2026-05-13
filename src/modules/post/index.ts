@@ -11,7 +11,7 @@ export const postCreateModule = {
   inputSchema: z.object({
     text: z.string().optional().describe("Direct text content of the post"),
     file: z.string().optional().describe("Path to a local Markdown file to use as post content"),
-    channel: z.string().describe("Channel ID or platform identifier (e.g., 'x', 'linkedin')"),
+    channel: z.string().describe("Channel ID"),
     schedule: z.string().optional().describe("Desired publication time (ISO 8601 format)"),
     image: z.string().optional().describe("Local path to an image file to attach as media")
   }),

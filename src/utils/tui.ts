@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { spawnSync } from "child_process";
 
 /**
  * AISee TUI Design System
@@ -11,8 +12,9 @@ import chalk from "chalk";
  * Detection order:
  *   1. AISEE_THEME env var (explicit override)
  *   2. COLORFGBG env var (set by xterm, some Terminal.app configs)
- *   3. OSC 11 escape query (asks the terminal emulator directly)
- *   4. Default: dark
+ *   3. Terminal-specific env vars (ITERM_PROFILE)
+ *   4. OS-level theme (macOS AppleInterfaceStyle)
+ *   5. Default: dark
  */
 
 function isLightBackground(): boolean {
@@ -20,18 +22,65 @@ function isLightBackground(): boolean {
   if (theme === "light") return true;
   if (theme === "dark") return false;
 
-  // COLORFGBG: "fg;bg" — bg 7 (ANSI white) or 15 (bright white) → light background.
+  // 1. COLORFGBG: "fg;bg" — bg 7 (ANSI white) or 15 (bright white) → light background.
   const fgbg = process.env.COLORFGBG;
   if (fgbg) {
     const bg = parseInt(fgbg.split(";").pop() ?? "", 10);
-    if (bg === 7 || bg === 15) return true;
-    if (!isNaN(bg)) return false;
+    // 0-6, 8-9 are usually dark; 7, 10-15 are light
+    if ((bg >= 0 && bg <= 6) || bg === 8 || bg === 9) return false;
+    if (bg === 7 || (bg >= 10 && bg <= 15)) return true;
   }
 
-  // Apple Terminal defaults to a white background; treat as light unless
-  // the user overrides with AISEE_THEME=dark.
-  if (process.env.TERM_PROGRAM === "Apple_Terminal") return true;
+  // 2. macOS Precise Terminal Detection (AppleScript)
+  // Queries the actual terminal window's background color.
+  if (process.platform === "darwin") {
+    const program = process.env.TERM_PROGRAM;
+    let script = "";
+    if (program === "Apple_Terminal") {
+      script = 'tell application "Terminal" to get background color of window 1';
+    } else if (program === "iTerm.app") {
+      script = 'tell application "iTerm" to get background color of current session of current window';
+    }
 
+    if (script) {
+      try {
+        const result = spawnSync("osascript", ["-e", script], { encoding: "utf8", timeout: 500 });
+        if (result.status === 0) {
+          const parts = result.stdout.split(",").map((s) => parseInt(s.trim(), 10));
+          if (parts.length === 3) {
+            // Perceived luminance formula (ITU-R BT.709)
+            // Values are 16-bit (0-65535)
+            const luminance = (0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2]) / 65535;
+            return luminance > 0.5;
+          }
+        }
+      } catch {
+        // ignore and fall through
+      }
+    }
+  }
+
+  // 3. iTerm2 profile detection fallback
+  if (process.env.ITERM_PROFILE?.toLowerCase().includes("light")) return true;
+  if (process.env.ITERM_PROFILE?.toLowerCase().includes("dark")) return false;
+
+  // 4. macOS system-wide detection (final hint)
+  if (process.platform === "darwin") {
+    try {
+      const result = spawnSync("defaults", ["read", "-g", "AppleInterfaceStyle"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 500,
+      });
+      if (result.stdout.trim() === "Dark") return false;
+      return true; // Key missing or not "Dark" usually means Light mode
+    } catch {
+      // Key missing on macOS often means Light mode
+      return true;
+    }
+  }
+
+  // Default: dark for safety
   return false;
 }
 

@@ -31,7 +31,7 @@ import { zodToJsonSchema } from "./utils/zod-to-schema.ts";
 import { ExecutorAdapter } from "./utils/executor-adapter.ts";
 import { RegistryAdapter } from "./utils/registry-adapter.ts";
 
-import pkg from "./package.json" with { type: "json" };
+import pkg from "../package.json" with { type: "json" };
 
 interface AiseeModule {
   description: string;

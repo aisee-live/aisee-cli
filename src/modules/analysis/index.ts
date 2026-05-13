@@ -294,20 +294,20 @@ function renderCompetitorList(competitors: string[]): string {
     .join(", ");
 }
 
-function buildAIPresenceVerbose(analyzerData: Record<string, unknown> | undefined): string {
+function buildAIPresenceVerbose(analyzerData: Record<string, unknown> | undefined, total: number | null): string {
   const rows = collectAIPresenceModels(analyzerData);
   if (rows.length === 0) return "";
   const parts: string[] = [];
-  parts.push("### AI Presence — Per-Model Detail", "");
+  parts.push(`### AI Presence ${total !== null ? ` — ${formatScoreNumber(total)}` : ""}`, "");
   parts.push(mdRecordTable(rows as unknown as Record<string, unknown>[]), "");
   return parts.join("\n");
 }
 
-function buildCompetitorVerbose(analyzerData: Record<string, unknown> | undefined): string {
+function buildCompetitorVerbose(analyzerData: Record<string, unknown> | undefined, total: number | null): string {
   const rows = collectCompetitorModels(analyzerData);
   if (rows.length === 0) return "";
   const parts: string[] = [];
-  parts.push("### Competitor Landscape — Per-Model Detail", "");
+  parts.push(`### Competitor Landscape ${total !== null ? ` — ${formatScoreNumber(total)}` : ""}`, "");
   // Group by platform vendor so the rendering matches the tabbed UI.
   const byPlatform = new Map<string, CompetitorModelRow[]>();
   for (const row of rows) {
@@ -470,11 +470,11 @@ function buildCrawlerAccessibilityVerbose(tags: Record<string, unknown> | undefi
   return parts.join("\n");
 }
 
-function buildStrategyVerbose(strategyAnalyzer: Record<string, unknown> | undefined): string {
+function buildStrategyVerbose(strategyAnalyzer: Record<string, unknown> | undefined, total: number | null): string {
   if (!strategyAnalyzer) return "";
   const breakdown = (strategyAnalyzer.result as Record<string, unknown> | undefined)?.score_breakdown as Record<string, number> | undefined;
   const parts: string[] = [];
-  parts.push("### Strategy Review — Detailed Breakdown", "");
+  parts.push(`### Strategy Review ${total !== null ? ` — ${formatScoreNumber(total)}` : ""}`, "");
   parts.push(buildContentAnswerabilityVerbose(
     strategyAnalyzer.content_answerability as Record<string, unknown> | undefined,
     typeof breakdown?.content_answerability === "number" ? breakdown.content_answerability : null,
@@ -601,11 +601,11 @@ function buildReportMarkdown(record: Record<string, unknown>, section: string, v
     // mirroring the three full-report tabs in the web app.
     if (verbose) {
       parts.push("## Detailed Breakdown", "");
-      const aiPresenceBlock = buildAIPresenceVerbose(aiPresenceData);
+      const aiPresenceBlock = buildAIPresenceVerbose(aiPresenceData, aiPresenceTotal);
       if (aiPresenceBlock) parts.push(aiPresenceBlock);
-      const competitorBlock = buildCompetitorVerbose(competitorData);
+      const competitorBlock = buildCompetitorVerbose(competitorData, competitorTotal);
       if (competitorBlock) parts.push(competitorBlock);
-      const strategyBlock = buildStrategyVerbose(strategyData);
+      const strategyBlock = buildStrategyVerbose(strategyData, strategyTotal);
       if (strategyBlock) parts.push(strategyBlock);
     }
 

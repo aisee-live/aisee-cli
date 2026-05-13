@@ -6,7 +6,7 @@ Command-line interface for [AISee](https://app.aisee.live) — automate AEO (Ans
 
 - **Device Authorization Flow (RFC 8628)** — browser-based OAuth login, no terminal passwords.
 - **AEO Analysis** — scan websites, fetch AI-presence reports, competitor analysis, strategic recommendations.
-- **Action Pipeline** — convert optimization tasks into social media post drafts in one command.
+- **Action Pipeline** — inspect individual tasks with `action-detail`, generate suggestions with `action-suggest`, and convert them into social media posts with `action-post`.
 - **Social Media Automation** — create, schedule, and publish posts across X, LinkedIn, Reddit, and more.
 - **Structured Output** — every command supports `--format json|table|csv|yaml|jsonl` and `--fields` dot-path selection.
 - **Built on apcore-cli 0.7.0** — audit logging, dry-run preflight, pipeline trace, approval gate.

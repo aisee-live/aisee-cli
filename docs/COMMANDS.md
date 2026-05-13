@@ -6,7 +6,7 @@ Available on every command. Built-in apcore options are hidden by default; pass 
 
 | Flag | Default | Description |
 |---|---|---|
-| `--format <type>` | `table` (TTY) / `json` (pipe) | Output format: `table`, `json`, `csv`, `yaml`, `jsonl` |
+| `--format <type>` | `table` (TTY) / `json` (pipe) | Output format: `tui`, `table`, `markdown`, `json`, `csv`, `yaml`, `jsonl` |
 | `--fields <paths>` | — | Comma-separated dot-paths to select from the result, e.g. `status,result.total_score` |
 | `--dry-run` | false | Run preflight checks without executing — shows what would happen |
 | `--trace` | false | Print per-step pipeline timing after the result |
@@ -104,6 +104,19 @@ aisee actions https://example.com --format json
 | `--sort-by <field>` | `position` | Sort field |
 | `--sort-order <asc\|desc>` | `asc` | Sort direction |
 | `--status <s>` | — | Filter by status: `pending`, `in_progress`, `completed` |
+
+### `aisee action-detail <action-id>`
+Show the full details of a single action task: metadata, description, and all solution steps.
+
+```bash
+aisee action-detail abc-123
+aisee action-detail abc-123 --format markdown
+aisee action-detail abc-123 --format json
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<action-id>` | required | Action task ID |
 
 ### `aisee action-suggest <action-id>`
 Get detailed AI-generated implementation suggestions for an action.
@@ -261,6 +274,8 @@ All commands that return data support `--format`:
 |---|---|
 | `table` | Human-readable (default in TTY) |
 | `json` | Machine-readable, piping (default when stdout is not a TTY) |
+| `tui` | Rich terminal UI with colour and layout |
+| `markdown` | Markdown source — pipe to a renderer or file |
 | `csv` | Spreadsheet export |
 | `yaml` | Config/document output |
 | `jsonl` | Streaming / log ingestion |

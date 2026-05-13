@@ -3,6 +3,23 @@ import { authClient } from "./auth.ts";
 import { loadCredentials, loadSettings, saveCredentials } from "../utils/config.ts";
 import { isDebug } from "../utils/log-level.ts";
 import { getFileBlob, basename } from "../utils/file-adapter.ts";
+import { UserError } from "../utils/errors.ts";
+
+function extractApiError(err: unknown): UserError {
+  const e = err as { response?: { status?: number; data?: unknown } };
+  const data = e.response?.data;
+  let detail: string | undefined;
+  if (data && typeof data === "object") {
+    const d = data as Record<string, unknown>;
+    detail = (d.detail ?? d.message ?? d.error) as string | undefined;
+  }
+  const status = e.response?.status;
+  const prefix = status ? `[${status}] ` : "";
+  return new UserError(`${prefix}${detail ?? String(err)}`);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cx = (p: Promise<any>): Promise<any> => p.catch((err: unknown): never => { throw extractApiError(err); });
 
 function generateId(length = 10): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -86,7 +103,7 @@ function buildPlatformSettings(platform: string, text?: string): Record<string, 
 }
 
 async function lookupChannelPlatform(channelId: string): Promise<string> {
-  const response = await postAgentAxios.get("/integrations/list");
+  const response = await cx(postAgentAxios.get("/integrations/list"));
   const integrations: any[] = response.data?.integrations ?? [];
   const match = integrations.find((ch: any) => ch.id === channelId);
   return match?.identifier ?? "";
@@ -133,7 +150,7 @@ export const postAgentClient = {
       posts,
     };
 
-    const response = await postAgentAxios.post(`/posts`, payload);
+    const response = await cx(postAgentAxios.post(`/posts`, payload));
     if (isDebug()) {
       console.error("[DEBUG] createPost payload:", JSON.stringify(payload, null, 2));
       console.error("[DEBUG] createPost response:", JSON.stringify(response.data, null, 2));
@@ -174,33 +191,33 @@ export const postAgentClient = {
   },
 
   async listPosts(filters: { state?: string; channel?: string[]; page?: number; pageSize?: number } = {}) {
-    const response = await postAgentAxios.get(`/posts/list`, { params: filters });
+    const response = await cx(postAgentAxios.get(`/posts/list`, { params: filters }));
     return response.data;
   },
 
   async getDashboard(period: string = "7d") {
-    const response = await postAgentAxios.get(`/dashboard/summary`, { params: { period } });
+    const response = await cx(postAgentAxios.get(`/dashboard/summary`, { params: { period } }));
     return response.data;
   },
 
   async publishPost(postId: string) {
-    const response = await postAgentAxios.post(`/posts/${postId}/retry`);
+    const response = await cx(postAgentAxios.post(`/posts/${postId}/retry`));
     return response.data;
   },
 
   async schedulePost(postId: string, time: string) {
-    const response = await postAgentAxios.put(`/posts/${postId}/date`, { date: time });
+    const response = await cx(postAgentAxios.put(`/posts/${postId}/date`, { date: time }));
     return response.data;
   },
 
   // Channels
   async listChannels() {
-    const response = await postAgentAxios.get(`/integrations/list`);
+    const response = await cx(postAgentAxios.get(`/integrations/list`));
     return response.data;
   },
 
   async removeChannel(id: string) {
-    const response = await postAgentAxios.delete(`/integrations`, { data: { id } });
+    const response = await cx(postAgentAxios.delete(`/integrations`, { data: { id } }));
     return response.data;
   },
 };

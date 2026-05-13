@@ -189,12 +189,26 @@ export const analysisClient = {
         task_id: productId,
         source_module: options.module,
         has_solution: options.has_solution,
-        page: options.page,
-        size: options.size,
+        page: options.page ?? 1,
+        size: options.size ?? 100,
         status: options.status
       }
     }));
     return response.data;
+  },
+
+  async getActionsByTaskId(taskId: string) {
+    const response = await cx(analysisAxios.get(`/action`, {
+      params: {
+        task_id: taskId,
+        size: 1000
+      }
+    }));
+    const result = response.data;
+    if (!result?.items || result.items.length <= 0) {
+      return [];
+    }
+    return result.items;
   },
 
   async pollUntilDone(taskId: string, label: string, intervalMs = 2000, timeoutMs = 120000): Promise<void> {

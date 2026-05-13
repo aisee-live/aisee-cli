@@ -6,7 +6,7 @@ import { productUrlSchema, normalizeProductUrl } from "../../utils/url.ts";
 import { UserError } from "../../utils/errors.ts";
 import { isDebug } from "../../utils/log-level.ts";
 import { getOutputFormat, isPresentationFormat } from "../../utils/format.ts";
-import { renderMarkdownToTui } from "../../utils/tui.ts";
+import { renderMarkdownToTui, colors as tuiColors } from "../../utils/tui.ts";
 
 function dbg(msg: string, data?: unknown): void {
   if (!isDebug()) return;
@@ -494,7 +494,54 @@ function buildStrategyVerbose(strategyAnalyzer: Record<string, unknown> | undefi
   return parts.filter((p) => p !== "").join("\n");
 }
 
-function buildReportMarkdown(record: Record<string, unknown>, section: string, verbose = false): string {
+const MODULE_ACTION_PREFIX: Record<string, string> = {
+  ai_presence: "ap",
+  ai_competitor: "ac",
+  web_fit: "sr",
+};
+
+function formatStars(impact: unknown): string {
+  const n = Math.round(parseFloat(String(impact ?? "")));
+  if (!Number.isFinite(n) || n < 1) return "";
+  const filled = Math.min(n, 5);
+  return "★".repeat(filled) + "☆".repeat(5 - filled);
+}
+
+function difficultyColor(diff: string): (s: string) => string {
+  switch (diff.toLowerCase()) {
+    case "easy": return tuiColors.green;
+    case "medium": return tuiColors.yellow;
+    case "hard": return tuiColors.red;
+    default: return tuiColors.gray;
+  }
+}
+
+function buildActionPlanSection(items: Record<string, unknown>[], moduleKey: string): string {
+  if (items.length === 0) return "";
+  const prefix = MODULE_ACTION_PREFIX[moduleKey] ?? "xx";
+  const parts: string[] = ["#### Action Plan", ""];
+  for (const item of items) {
+    const sn = String(item.sn ?? "").padStart(2, "0");
+    const taskId = tuiColors.orange.bold(`#${prefix}${sn}`);
+    const title = tuiColors.white.bold(String(item.title ?? "(no title)"));
+    const diffStr = String(item.difficulty ?? "").toLowerCase();
+    const diff = diffStr ? difficultyColor(diffStr)(`[${diffStr}]`) : "";
+    const stars = tuiColors.gold(formatStars(item.impact_rating));
+    parts.push([taskId, title, diff, stars].filter(Boolean).join("  "));
+    if (item.description) parts.push(tuiColors.dim(String(item.description).trim()));
+    const cur = parseFloat(String(item.current_score ?? ""));
+    const exp = parseFloat(String(item.expected_score ?? ""));
+    const curText = Number.isFinite(cur) ? cur.toFixed(1) : "-";
+    const expText = Number.isFinite(exp) ? exp.toFixed(1) : "-";
+    const deltaText = Number.isFinite(cur) && Number.isFinite(exp)
+      ? `  ${tuiColors.green(`+${(exp - cur).toFixed(1)}`)}`
+      : "";
+    parts.push(`${tuiColors.gray("current:")} ${tuiColors.orange(curText)} ${tuiColors.gray("→ expected:")} ${tuiColors.orange(expText)}${deltaText}`, "");
+  }
+  return parts.join("\n");
+}
+
+function buildReportMarkdown(record: Record<string, unknown>, section: string, verbose = false, actionsMap?: Record<string, Record<string, unknown>[]>): string {
   const resultObj = record.result as Record<string, unknown> | undefined;
   const url = String(record.url ?? "");
   const sectionLabel = section === "summary" ? "Summary" : section.charAt(0).toUpperCase() + section.slice(1);
@@ -600,13 +647,24 @@ function buildReportMarkdown(record: Record<string, unknown>, section: string, v
     // Verbose mode: append per-model details and full strategy breakdown
     // mirroring the three full-report tabs in the web app.
     if (verbose) {
-      parts.push("## Detailed Breakdown", "");
+      parts.push("## Detailed Breakdown", "", "---", "");
+
       const aiPresenceBlock = buildAIPresenceVerbose(aiPresenceData, aiPresenceTotal);
       if (aiPresenceBlock) parts.push(aiPresenceBlock);
+      const presenceActions = actionsMap?.["ai_presence"] ?? [];
+      if (presenceActions.length > 0) parts.push(buildActionPlanSection(presenceActions, "ai_presence"));
+
+      parts.push("---", "");
       const competitorBlock = buildCompetitorVerbose(competitorData, competitorTotal);
       if (competitorBlock) parts.push(competitorBlock);
+      const competitorActions = actionsMap?.["ai_competitor"] ?? [];
+      if (competitorActions.length > 0) parts.push(buildActionPlanSection(competitorActions, "ai_competitor"));
+
+      parts.push("---", "");
       const strategyBlock = buildStrategyVerbose(strategyData, strategyTotal);
       if (strategyBlock) parts.push(strategyBlock);
+      const strategyActions = actionsMap?.["web_fit"] ?? [];
+      if (strategyActions.length > 0) parts.push(buildActionPlanSection(strategyActions, "web_fit"));
     }
 
     return parts.join("\n").replace(/\n+$/, "") + "\n";
@@ -997,11 +1055,24 @@ export const reportModule = {
     if (isVerbose && !isModulePresentationFormat(effectiveFmt)) return raw;
 
     if (raw && typeof raw === "object" && "result" in (raw as object)) {
+      let actionsMap: Record<string, Record<string, unknown>[]> | undefined;
+      if (isVerbose) {
+        const rootTaskId = (raw as Record<string, unknown>).id as string | undefined;
+        if (rootTaskId) {
+          const allActions = await analysisClient.getActionsByTaskId(rootTaskId).catch(() => [] as Record<string, unknown>[]);
+          actionsMap = { ai_presence: [], ai_competitor: [], web_fit: [] };
+          for (const item of allActions as Record<string, unknown>[]) {
+            const mod = String(item.source_module ?? "");
+            if (mod in actionsMap) actionsMap[mod].push(item);
+          }
+        }
+      }
+
       if (effectiveFmt === "markdown") {
-        return buildReportMarkdown(raw as Record<string, unknown>, section, isVerbose);
+        return buildReportMarkdown(raw as Record<string, unknown>, section, isVerbose, actionsMap);
       }
       if (effectiveFmt === "tui") {
-        return renderMarkdownToTui(buildReportMarkdown(raw as Record<string, unknown>, section, isVerbose));
+        return renderMarkdownToTui(buildReportMarkdown(raw as Record<string, unknown>, section, isVerbose, actionsMap));
       }
       if (effectiveFmt === "table") {
         return summarizeReport(raw as Record<string, unknown>, section);
@@ -1042,8 +1113,8 @@ export const actionsListModule = {
   inputSchema: z.object({
     url: productUrlSchema.describe("Website URL"),
     module: z.string().optional().describe("Filter by source module (ai_presence, competitor, strategy)"),
-    page: z.number().int().min(1).default(1),
-    size: z.number().int().min(1).max(1000).default(10),
+    // page: z.number().int().min(1).default(1),
+    // size: z.number().int().min(1).max(1000).default(100),
     sort_by: z.string().default("position"),
     sort_order: z.enum(["asc", "desc"]).default("asc"),
     status: z.string().optional().describe("Filter by status (pending, in_progress, completed...)"),
@@ -1257,6 +1328,125 @@ function formatTaskResultMarkdown(data: Record<string, unknown>): string {
   return parts.join("\n").replace(/\n+$/, "") + "\n";
 }
 
+const RULE = "─".repeat(72);
+
+function statusTableGlyph(status: string): string {
+  if (status === "completed") return "✓";
+  if (status === "failed") return "✗";
+  return "○";
+}
+
+function formatCodeBox(code: string): string {
+  const divider = "  " + "─".repeat(68);
+  const lines = code.split("\n").map(l => `  ${l}`);
+  return [divider, ...lines, divider].join("\n");
+}
+
+function renderTaskBody(task: TaskItem, parts: string[]): void {
+  if (task.content) {
+    parts.push("CONTENT");
+    String(task.content).trim().split("\n").forEach(l => parts.push(`  ${l}`));
+    parts.push("");
+  }
+  if (task.code) {
+    parts.push("CODE EXAMPLE");
+    parts.push(formatCodeBox(String(task.code)));
+    parts.push("");
+  }
+  if (Array.isArray(task.steps) && task.steps.length > 0) {
+    parts.push("STEPS");
+    (task.steps as unknown[]).forEach((step, n) => parts.push(`  ${n + 1}. ${String(step)}`));
+    parts.push("");
+  }
+}
+
+function formatSuggestTable(data: Record<string, unknown>, action: Record<string, unknown> | null): string {
+  const overallStatus = String(data.status ?? "");
+  const tasks = Array.isArray(data.tasks) ? data.tasks as TaskItem[] : [];
+
+  const difficulty = action ? String(action.difficulty ?? "") : "";
+  const impactRating = action ? parseFloat(String(action.impact_rating ?? "")) : NaN;
+  const currentScore = action ? parseFloat(String(action.current_score ?? "")) : NaN;
+  const expectedScore = action ? parseFloat(String(action.expected_score ?? "")) : NaN;
+  const actionStatus = action ? String(action.status ?? "") : "";
+  const scoreLabel = action ? String(action.analysis_cat ?? "") : "";
+
+  const parts: string[] = [];
+  parts.push(`ACTIONS.SUGGEST  ${statusTableGlyph(overallStatus)} ${overallStatus}`);
+  parts.push(RULE, "");
+
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
+    const typeStr = task.type ? `[${String(task.type).toUpperCase()}]` : "";
+    const diffStr = difficulty ? `[${difficulty}]` : "";
+    const starsStr = Number.isFinite(impactRating) && impactRating > 0 ? formatStars(impactRating) : "";
+    const typeLine = [typeStr, diffStr, starsStr].filter(Boolean).join(" ");
+
+    parts.push(`TASK #${i + 1}`);
+    parts.push(`title    ${String(task.title ?? "")}`);
+    if (typeLine) parts.push(`type     ${typeLine}`);
+    if (scoreLabel && Number.isFinite(currentScore) && Number.isFinite(expectedScore)) {
+      const delta = expectedScore - currentScore;
+      parts.push(`score    ${scoreLabel}  ${currentScore.toFixed(1)} → ${expectedScore.toFixed(1)} (+${delta.toFixed(1)})`);
+    }
+    if (actionStatus) parts.push(`status   ${statusTableGlyph(actionStatus)} ${actionStatus}`);
+    parts.push(RULE, "");
+
+    renderTaskBody(task, parts);
+
+    if (i < tasks.length - 1) parts.push(RULE, "");
+  }
+
+  return parts.join("\n").replace(/\n+$/, "") + "\n";
+}
+
+function formatActionDetailTable(action: Record<string, unknown>): string {
+  const actionStatus = String(action.status ?? "");
+  const difficulty = String(action.difficulty ?? "");
+  const impactRating = parseFloat(String(action.impact_rating ?? ""));
+  const currentScore = parseFloat(String(action.current_score ?? ""));
+  const expectedScore = parseFloat(String(action.expected_score ?? ""));
+  const scoreLabel = String(action.analysis_cat ?? "");
+  const solutions = Array.isArray(action.solution_data) ? action.solution_data as TaskItem[] : [];
+  const primaryType = solutions[0]?.type ? String(solutions[0].type).toUpperCase() : "";
+
+  const parts: string[] = [];
+  parts.push(`ACTIONS.DETAIL  ${statusTableGlyph(actionStatus)} ${actionStatus}`);
+  parts.push(RULE, "");
+
+  const typeStr = primaryType ? `[${primaryType}]` : "";
+  const diffStr = difficulty ? `[${difficulty}]` : "";
+  const starsStr = Number.isFinite(impactRating) && impactRating > 0 ? formatStars(impactRating) : "";
+  const typeLine = [typeStr, diffStr, starsStr].filter(Boolean).join(" ");
+
+  parts.push(`TASK #${String(action.sn ?? 1)}`);
+  parts.push(`title    ${String(action.title ?? "")}`);
+  if (typeLine) parts.push(`type     ${typeLine}`);
+  if (scoreLabel && Number.isFinite(currentScore) && Number.isFinite(expectedScore)) {
+    const delta = expectedScore - currentScore;
+    parts.push(`score    ${scoreLabel}  ${currentScore.toFixed(1)} → ${expectedScore.toFixed(1)} (+${delta.toFixed(1)})`);
+  }
+  parts.push(`status   ${statusTableGlyph(actionStatus)} ${actionStatus}`);
+  parts.push(RULE, "");
+
+  if (action.description) {
+    parts.push("DESCRIPTION");
+    String(action.description).trim().split("\n").forEach(l => parts.push(`  ${l}`));
+    parts.push("");
+  }
+
+  solutions.forEach((task, i) => {
+    if (solutions.length > 1) {
+      const type = task.type ? `[${String(task.type).toUpperCase()}]` : "";
+      parts.push(`SOLUTION #${i + 1}  ${type}  ${task.title ?? ""}`.trimEnd(), "");
+    }
+    renderTaskBody(task, parts);
+    if (i < solutions.length - 1) parts.push(RULE, "");
+  });
+
+  return parts.join("\n").replace(/\n+$/, "") + "\n";
+}
+
 export const actionsSuggestModule = {
   description: "Get detailed AI implementation suggestions",
   inputSchema: z.object({
@@ -1264,17 +1454,84 @@ export const actionsSuggestModule = {
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    const data = await analysisClient.getSuggestion(input.action_id);
     const fmt = getEffectiveFormat();
     if (fmt === "markdown") {
+      const data = await analysisClient.getSuggestion(input.action_id);
       return formatTaskResultMarkdown(data as Record<string, unknown>);
     }
-    if (fmt === "table") {
-      return formatTaskResult(data as Record<string, unknown>);
+    if (fmt === "table" || fmt === "tui") {
+      const [data, action] = await Promise.all([
+        analysisClient.getSuggestion(input.action_id),
+        analysisClient.getAction(input.action_id).catch(() => null),
+      ]);
+      return formatSuggestTable(data as Record<string, unknown>, action as Record<string, unknown> | null);
     }
+    return analysisClient.getSuggestion(input.action_id);
+  }
+};
+
+export const actionDetailModule = {
+  description: "Show full details of a single action task",
+  inputSchema: z.object({
+    action_id: z.string().describe("Action task ID"),
+  }),
+  outputSchema: z.any(),
+  async execute(input: any) {
+    const data = await analysisClient.getAction(input.action_id) as Record<string, unknown>;
+    if (!data) throw new UserError(`Action ${input.action_id} not found`);
+
+    const fmt = getEffectiveFormat();
+
+    if (fmt === "markdown") return buildActionDetailMarkdown(data);
+    if (fmt === "tui") return renderMarkdownToTui(buildActionDetailMarkdown(data));
+    if (fmt === "table") return formatActionDetailTable(data);
+
     return data;
   }
 };
+
+function buildActionDetailMarkdown(item: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const title = String(item.title ?? "(no title)");
+  parts.push(`# Action Detail — ${title}`, "");
+
+  const meta: Record<string, unknown> = {
+    ID: item.id,
+    SN: item.sn,
+    Module: item.source_module,
+    Category: item.analysis_cat,
+    Difficulty: item.difficulty,
+    Impact: item.impact_rating,
+    "Current Score": item.current_score,
+    "Expected Score": item.expected_score,
+    Status: item.status,
+  };
+  parts.push(mdKeyValueTable(meta), "");
+
+  if (item.description) {
+    parts.push("## Description", "", String(item.description).trim(), "");
+  }
+
+  const solutions = item.solution_data;
+  if (Array.isArray(solutions) && solutions.length > 0) {
+    parts.push("## Solutions", "");
+    const tasks = solutions as TaskItem[];
+    tasks.forEach((s, i) => {
+      const type = (s.type ?? "?").toUpperCase();
+      const platform = s.platform ? ` · ${s.platform}` : "";
+      parts.push(`### ${i + 1}. [${type}${platform}] ${s.title ?? ""}`, "");
+      if (s.content) parts.push(s.content.trim(), "");
+      if (s.code) parts.push("```", s.code.trim(), "```", "");
+      if (Array.isArray(s.steps) && s.steps.length > 0) {
+        parts.push("**Steps:**", "");
+        s.steps.forEach((step, n) => parts.push(`${n + 1}. ${String(step)}`));
+        parts.push("");
+      }
+    });
+  }
+
+  return parts.join("\n").replace(/\n+$/, "") + "\n";
+}
 
 export const actionsPostModule = {
   description: "Create social media posts from action solution data",

@@ -13,6 +13,7 @@ import {
   actionsListModule,
   actionsSuggestModule,
   actionsPostModule,
+  actionDetailModule,
 } from "./modules/analysis/index.ts";
 import {
   postCreateModule,
@@ -115,6 +116,7 @@ async function main() {
   registry.register("actions.list", actionsListModule);
   registry.register("actions.suggest", actionsSuggestModule);
   registry.register("actions.post", actionsPostModule);
+  registry.register("actions.detail", actionDetailModule);
   registry.register("post.create", postCreateModule);
   registry.register("post.list", postListModule);
   registry.register("post.dashboard", postDashboardModule);
@@ -169,7 +171,11 @@ async function main() {
     "url",
   ));
 
-  // action-suggest <action-id> / action-post <action-id> — top-level per docs/COMMANDS.md
+  // action-detail / action-suggest / action-post — top-level per docs/COMMANDS.md
+  program.addCommand(withPositionals(
+    buildAiseeCommand(makeDescriptor("actions.detail", actionDetailModule), executor, 1000, "action-detail"),
+    "action_id",
+  ));
   program.addCommand(withPositionals(
     buildAiseeCommand(makeDescriptor("actions.suggest", actionsSuggestModule), executor, 1000, "action-suggest"),
     "action_id",

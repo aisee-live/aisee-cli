@@ -43,7 +43,9 @@ interface AiseeModule {
  * Follows GNU convention: primary subject is positional, flags stay as --options.
  * Supports both `cmd <val>` and `cmd --opt <val>` transparently.
  *
- * @param mappings  Ordered list of [positionalIndex, optionName] pairs.
+ * Shows command help when a required positional is missing — apcore-cli ≥0.9.1
+ * already catches the same case via schema validation (exit 45), but showing
+ * the full help text is more useful for interactive users.
  */
 function withPositionals(cmd: Command, ...optionNames: string[]): Command {
   cmd.hook("preAction", (thisCmd) => {
@@ -55,6 +57,18 @@ function withPositionals(cmd: Command, ...optionNames: string[]): Command {
         thisCmd.setOptionValue(optName, val);
       }
     });
+
+    for (const optName of optionNames) {
+      if (thisCmd.getOptionValue(optName) == null) {
+        if (process.stderr.isTTY) {
+          process.stderr.write(`error: missing required argument <${optName}>\n\n`);
+          process.stderr.write(thisCmd.helpInformation());
+        } else {
+          emitErrorJson(new Error(`missing required argument <${optName}>`), 1);
+        }
+        process.exit(1);
+      }
+    }
   });
   return cmd;
 }
@@ -237,12 +251,6 @@ async function main() {
     const errRecord = err as Record<string, unknown>;
     if (errRecord?.code === "commander.helpDisplayed" || errRecord?.code === "commander.version") {
       process.exit(0);
-    }
-    if (errRecord?.code === "MODULE_EXECUTE_ERROR" && process.stderr.isTTY) {
-      const reason = (errRecord?.reason as string) ?? (errRecord?.message as string) ?? String(err);
-      const inner = reason.replace(/^Module '[^']+' raised \w+: /, "");
-      process.stderr.write(`Error: ${inner}\n`);
-      process.exit(1);
     }
     const exitCode = exitCodeForError(err);
     if (process.stderr.isTTY) {

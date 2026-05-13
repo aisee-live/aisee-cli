@@ -28,12 +28,14 @@ function rethrowUserError(err: unknown): never {
   const record = err as Record<string, unknown>;
   if (record?.code === "MODULE_EXECUTE_ERROR") {
     const details = record?.details as Record<string, unknown> | undefined;
-    const reason = (details?.reason as string) ?? "";
-    if (reason.includes("UserError:")) {
-      const inner = reason.replace(/^Module '[^']+' raised UserError: /, "");
+    const reason = (details?.reason as string) ?? (record?.message as string) ?? String(err);
+    const inner = reason.replace(/^Module '[^']+' raised \w+: /, "");
+    if (process.stderr.isTTY) {
       process.stderr.write(`Error: ${inner}\n`);
-      process.exit(1);
+    } else {
+      process.stderr.write(JSON.stringify({ error: true, code: "MODULE_EXECUTE_ERROR", message: inner, exit_code: 1 }) + "\n");
     }
+    process.exit(1);
   }
   throw err;
 }

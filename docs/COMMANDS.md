@@ -144,14 +144,14 @@ aisee action-post abc-123
 Create a new social media post.
 
 ```bash
-aisee post create --channel x --text "Hello world"
-aisee post create --channel linkedin --file ./draft.md --schedule 2026-05-01T10:00:00Z
-aisee post create --channel instagram --text "Caption" --image ./photo.jpg
+aisee post create --channel <channel id> --text "Hello world"
+aisee post create --channel <channel id> --file ./draft.md --schedule 2026-05-01T10:00:00Z
+aisee post create --channel <channel id> --text "Caption" --image ./photo.jpg
 ```
 
 | Flag | Default | Description |
 |---|---|---|
-| `--channel <id>` | required | Channel ID or platform name |
+| `--channel <id>` | required | Channel ID|
 | `--text <content>` | — | Direct post text |
 | `--file <path>` | — | Path to a Markdown file (alternative to `--text`) |
 | `--schedule <iso>` | — | Scheduled publication time (ISO 8601) |

@@ -24,6 +24,7 @@ import {
   channelListModule,
   channelAddModule,
   channelRemoveModule,
+  channelSelectModule,
 } from "./modules/post/index.ts";
 import { configListModule, configSetModule, configSpecModule } from "./modules/config.ts";
 import { zodToJsonSchema } from "./utils/zod-to-schema.ts";
@@ -125,6 +126,7 @@ async function main() {
   registry.register("channels.list", channelListModule);
   registry.register("channels.add", channelAddModule);
   registry.register("channels.remove", channelRemoveModule);
+  registry.register("channels.select", channelSelectModule);
   registry.register("config.list", configListModule);
   registry.register("config.set", configSetModule);
   registry.register("config.spec", configSpecModule);
@@ -210,6 +212,10 @@ async function main() {
   channels.addCommand(withPositionals(
     buildAiseeCommand(makeDescriptor("channels.remove", channelRemoveModule), executor, 1000, "remove"),
     "id",
+  ));
+  channels.addCommand(withPositionals(
+    buildAiseeCommand(makeDescriptor("channels.select", channelSelectModule), executor, 1000, "select"),
+    "url",
   ));
 
   // config

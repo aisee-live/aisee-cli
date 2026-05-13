@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { postAgentClient, type MediaObject } from "../../clients/post-agent.ts";
+import { analysisClient } from "../../clients/analysis.ts";
+import { UserError } from "../../utils/errors.ts";
+import { productUrlSchema, getDomain } from "../../utils/url.ts";
 import open from "open";
 import { loadSettingsWithSource } from "../../utils/config.ts";
 
@@ -242,6 +245,91 @@ export const channelRemoveModule = {
 
     return { success };
   }
+};
+
+export const channelSelectModule = {
+  description: "Bind channels to a product, or show its current channel config",
+  inputSchema: z.object({
+    url: productUrlSchema.describe("Product website URL"),
+    channels: z.string().optional().describe(
+      "Comma-separated channel IDs to bind. Omit to show the current config."
+    ),
+  }),
+  outputSchema: z.any(),
+  async execute(input: any) {
+    const productId = getDomain(input.url as string);
+    const effectiveFmt = getFmt();
+
+    if (!input.channels) {
+      const product = await analysisClient.getProduct(productId);
+      const configChannels: any[] = product?.config?.channels ?? [];
+
+      if (effectiveFmt === "markdown") {
+        if (configChannels.length === 0) {
+          return `# Channel Config — ${productId}\n\n_No channels configured. Run \`aisee channels select ${input.url} --channels <id,...>\` to bind channels._\n`;
+        }
+        const rows = configChannels.map((ch: any) => ({
+          ID: ch.id,
+          Platform: ch.identifier ?? ch.type ?? "",
+          Name: ch.display ?? ch.name ?? "",
+          Disabled: ch.disable ? "Yes" : "No",
+        }));
+        return [`# Channel Config — ${productId}`, "", mdRecordTable(rows)].join("\n") + "\n";
+      }
+
+      if (effectiveFmt === "table") {
+        if (configChannels.length === 0) {
+          return `No channels configured for '${productId}'. Run: aisee channels select ${input.url} --channels <id,...>`;
+        }
+        return formatChannelTable(configChannels.map((ch: any) => ({
+          id: ch.id,
+          platform: ch.identifier ?? ch.type ?? "",
+          name: ch.display ?? ch.name ?? "",
+          connected: !ch.disable && !ch.deletedAt,
+        })));
+      }
+
+      return configChannels;
+    }
+
+    const channelIds = String(input.channels)
+      .split(",")
+      .map((id: string) => id.trim())
+      .filter(Boolean);
+
+    if (channelIds.length === 0) {
+      throw new UserError("No channel IDs provided.");
+    }
+
+    const data = await postAgentClient.listChannels();
+    const integrations: any[] = data?.integrations ?? [];
+
+    const matched = integrations.filter((ch: any) => channelIds.includes(ch.id));
+    const notFound = channelIds.filter((id: string) => !integrations.find((ch: any) => ch.id === id));
+
+    if (notFound.length > 0) {
+      throw new UserError(
+        `Channel(s) not found: ${notFound.join(", ")}. Run 'aisee channels list' to see available channels.`
+      );
+    }
+
+    await analysisClient.configChannels(productId, matched);
+
+    if (effectiveFmt === "markdown") {
+      const rows = matched.map((ch: any) => ({
+        ID: ch.id,
+        Platform: ch.identifier ?? ch.type ?? "",
+        Name: ch.display ?? ch.name ?? "",
+      }));
+      return [`# Channels Configured`, "", `Product: \`${productId}\``, "", mdRecordTable(rows)].join("\n") + "\n";
+    }
+
+    if (effectiveFmt === "table") {
+      return `Configured ${matched.length} channel(s) for '${productId}'.`;
+    }
+
+    return { product_id: productId, channels: matched.map((ch: any) => ch.id) };
+  },
 };
 
 function formatKV(obj: Record<string, unknown>): string {

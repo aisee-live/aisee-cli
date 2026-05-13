@@ -25,7 +25,8 @@ const createAxiosInstance = (serviceType: keyof Settings | "authApiUrl"): AxiosI
     const settings = await loadSettings();
     const creds = await loadCredentials();
 
-    config.baseURL = settings[serviceType as keyof Settings];
+    const baseURL = settings[serviceType as keyof Settings];
+    config.baseURL = typeof baseURL === "string" ? baseURL : undefined;
 
     if (settings.allowInsecure) {
       config.httpsAgent = new https.Agent({ rejectUnauthorized: false });

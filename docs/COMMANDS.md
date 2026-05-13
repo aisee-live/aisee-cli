@@ -227,6 +227,29 @@ Disconnect and remove a social media integration.
 aisee channels remove abc-123
 ```
 
+### `aisee channels select <url>`
+Bind social media channels to a product, or view the current channel configuration.
+
+Used by `aisee action-post` to determine which channels to publish to when running analysis-driven posting.
+
+**View current config** (no `--channels` flag):
+```bash
+aisee channels select https://example.com
+aisee channels select https://example.com --format json
+```
+
+**Bind channels to a product:**
+```bash
+aisee channels select https://example.com --channels <id1>,<id2>
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<url>` | required | Product website URL |
+| `--channels <ids>` | — | Comma-separated channel IDs to bind. Omit to show current config. |
+
+> Channel IDs come from `aisee channels list`.
+
 ---
 
 ## Config

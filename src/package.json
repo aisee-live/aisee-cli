@@ -48,9 +48,9 @@
     "url": "https://github.com/aisee-live/aisee-cli/issues"
   },
   "dependencies": {
-    "apcore-cli": "^0.8.1",
+    "apcore-cli": "^0.9.0",
     "apcore-js": "^0.21.1",
-    "apcore-toolkit": "^0.6.1",
+    "apcore-toolkit": "^0.7.0",
     "axios": "^1.6.0",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",

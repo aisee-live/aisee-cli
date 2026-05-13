@@ -276,4 +276,11 @@ export const analysisClient = {
     const response = await cx(analysisAxios.post(`/action/${action_id}/set-post`, { sn, post_id }));
     return response.data;
   },
+
+  async configChannels(productId: string, channels: Record<string, unknown>[]) {
+    const response = await cx(analysisAxios.post(`/product/config/channles`, channels, {
+      params: { product_id: productId }
+    }));
+    return response.data;
+  },
 };

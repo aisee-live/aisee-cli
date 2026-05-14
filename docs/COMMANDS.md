@@ -26,7 +26,12 @@ Opens the browser automatically. Polls for authorization and stores tokens on su
 
 ```bash
 aisee login
+aisee login --client-id my-custom-app
 ```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--client-id <id>` | `aisee-cli` | Optional client identifier |
 
 ### `aisee logout`
 Clear local credentials (`~/.config/aisee/credentials.json`).
@@ -271,13 +276,18 @@ aisee config list
 aisee config list --format json
 ```
 
-### `aisee config set`
+### `aisee config set <key> <value>`
 Update a configuration value in `~/.config/aisee/config.yaml`.
 
 ```bash
-aisee config set --key analysis_api_url --value https://api.aisee.live
-aisee config set --key auth_api_url     --value https://api-auth.aisee.live
+aisee config set analysis_api_url https://api.aisee.live
+aisee config set auth_api_url     https://api-auth.aisee.live
 ```
+
+| Argument | Description |
+|---|---|
+| `<key>` | Config key to update: `auth_api_url`, `analysis_api_url`, `post_agent_api_url`, `app_url` |
+| `<value>` | New value for the config key |
 
 | Key | Description |
 |---|---|

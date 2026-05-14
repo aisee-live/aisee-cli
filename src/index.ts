@@ -94,7 +94,7 @@ function withEnhancedFormats(cmd: Command): Command {
 }
 
 function withVerbose(cmd: Command): Command {
-  return cmd.option("--verbose", "Return raw API response instead of formatted output");
+  return cmd.option("--verbose", "Show detailed output or return raw API response");
 }
 
 function makeDescriptor(moduleId: string, mod: AiseeModule): ModuleDescriptor {

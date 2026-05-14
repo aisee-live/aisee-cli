@@ -27,11 +27,18 @@ const ANALYZER_DISPLAY_NAMES: Record<string, string> = {
   code_ai_presence_analyzer: "ai_presence_score",
 };
 
-// Maps CLI section names to keys inside result object
+// Maps CLI section names to keys inside result object for report navigation
 const SECTION_TO_ANALYZER_KEY: Record<string, string> = {
   presence: "code_ai_presence_analyzer",
   competitor: "code_ai_competitor_analyzer",
   strategy: "code_web_fit_analyzer",
+};
+
+// Maps CLI section names to internal module identifiers used by the Actions API
+const CLI_TO_API_MODULE: Record<string, string> = {
+  presence: "ai_presence",
+  competitor: "ai_competitor",
+  strategy: "web_fit",
 };
 
 // Maps internal AI model identifiers to user-facing platform/vendor names.
@@ -55,6 +62,14 @@ const STRATEGY_LABELS: Record<string, string> = {
   structured_data: "Structured Data",
   ai_crawler_accessibility: "AI Crawler Accessibility",
 };
+
+function mapInternalModuleToUserFacing(mod: string | undefined | null): string {
+  const m = String(mod ?? "").toLowerCase();
+  if (m === "ai_presence" || m === "code_ai_presence_analyzer") return "presence";
+  if (m === "ai_competitor" || m === "code_ai_competitor_analyzer") return "competitor";
+  if (m === "web_fit" || m === "code_web_fit_analyzer") return "strategy";
+  return String(mod ?? "");
+}
 
 
 function formatTimestamp(iso: string): string {
@@ -1084,10 +1099,12 @@ export const reportModule = {
 };
 
 function summarizeAction(item: Record<string, unknown>): Record<string, unknown> {
+  const mappedModule = mapInternalModuleToUserFacing(item.source_module as string);
+
   const out: Record<string, unknown> = {
     id: item.id,
     sn: item.sn,
-    module: item.source_module,
+    module: mappedModule,
     category: item.analysis_cat,
     title: item.title,
     difficulty: item.difficulty,
@@ -1112,9 +1129,9 @@ export const actionsListModule = {
   description: "List actionable optimization tasks",
   inputSchema: z.object({
     url: productUrlSchema.describe("Website URL"),
-    module: z.string().optional().describe("Filter by source module (ai_presence, competitor, strategy)"),
-    // page: z.number().int().min(1).default(1),
-    // size: z.number().int().min(1).max(1000).default(100),
+    module: z.string().optional().describe("Filter by source module (presence, competitor, strategy)"),
+    page: z.number().int().min(1).optional().default(1).describe("Page number"),
+    size: z.number().int().min(1).max(1000).optional().default(100).describe("Items per page (max 1000)"),
     sort_by: z.string().default("position"),
     sort_order: z.enum(["asc", "desc"]).default("asc"),
     status: z.string().optional().describe("Filter by status (pending, in_progress, completed...)"),
@@ -1123,6 +1140,9 @@ export const actionsListModule = {
   outputSchema: z.any(),
   async execute(input: any) {
     input.url = normalizeProductUrl(input.url);
+    if (input.module) {
+      input.module = CLI_TO_API_MODULE[input.module] ?? input.module;
+    }
     const raw = await analysisClient.getActions(input.url, input);
 
     const effectiveFmt = getEffectiveFormat();
@@ -1183,7 +1203,7 @@ function buildActionsMarkdown(
     const meta: Record<string, unknown> = {
       ID: item.id,
       SN: item.sn,
-      Module: item.source_module,
+      Module: mapInternalModuleToUserFacing(item.source_module as string),
       Category: item.analysis_cat,
       Difficulty: item.difficulty,
       Impact: item.impact_rating,
@@ -1498,7 +1518,7 @@ function buildActionDetailMarkdown(item: Record<string, unknown>): string {
   const meta: Record<string, unknown> = {
     ID: item.id,
     SN: item.sn,
-    Module: item.source_module,
+    Module: mapInternalModuleToUserFacing(item.source_module as string),
     Category: item.analysis_cat,
     Difficulty: item.difficulty,
     Impact: item.impact_rating,

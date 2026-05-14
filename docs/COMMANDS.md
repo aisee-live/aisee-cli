@@ -2,7 +2,7 @@
 
 ## Global Options
 
-Available on every command. Built-in apcore options are hidden by default; pass `--verbose` to reveal them.
+Available on every command. Built-in apcore options are hidden by default; pass `--all-options` to reveal them.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -11,7 +11,7 @@ Available on every command. Built-in apcore options are hidden by default; pass 
 | `--dry-run` | false | Run preflight checks without executing — shows what would happen |
 | `--trace` | false | Print per-step pipeline timing after the result |
 | `--log-level <level>` | `WARNING` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `--verbose` | false | Show all built-in options in help output |
+| `--verbose` | false | Show detailed output or return raw API response |
 | `-V, --version` | — | Print CLI version |
 | `-h, --help` | — | Print help |
 
@@ -48,7 +48,7 @@ aisee whoami --format json
 ## Analysis
 
 ### `aisee scan <url>`
-Start a full AEO analysis scan for a website.
+Start AEO analysis for a product with complete task orchestration.
 
 ```bash
 aisee scan https://example.com
@@ -59,9 +59,10 @@ aisee scan https://example.com --format json
 | Flag | Default | Description |
 |---|---|---|
 | `<url>` | required | Website URL to scan |
-| `--task-template-id <id>` | — | Custom task template |
+| `--module <name>` | — | Specify a module to scan |
 | `--streaming` | false | Enable streaming HTTP response from analysis API |
 | `--use-demo` | false | Demo mode — no credits consumed |
+| `--no-wait` | — | Return immediately after submitting (default: wait for results) |
 
 ### `aisee report <url>`
 Retrieve the aggregated analysis report for a URL.
@@ -69,7 +70,7 @@ Retrieve the aggregated analysis report for a URL.
 ```bash
 aisee report https://example.com
 aisee report https://example.com --verbose          # show detailed per-model breakdown
-aisee report https://example.com --section ai-presence
+aisee report https://example.com --section presence
 aisee report https://example.com --history          # list all historical versions
 aisee report https://example.com --ver 7.0          # fetch a specific version
 aisee report https://example.com --format json --fields result.total_score
@@ -78,10 +79,12 @@ aisee report https://example.com --format json --fields result.total_score
 | Flag | Default | Description |
 |---|---|---|
 | `<url>` | required | Website URL |
-| `--section <name>` | `summary` | `summary`, `ai-presence`, `competitor`, `strategy`, `seo`, `mentions` |
+| `--section <name>` | `summary` | `summary`, `presence`, `competitor`, `strategy` |
 | `--ver <v>` | — | Fetch a specific historical version |
 | `--history` | false | List all available historical versions |
-| `--verbose` | false | Show detailed per-model breakdown for AI Presence, Competitor Landscape, and Strategy Review |
+| `--page <n>` | 1 | Page number for history listing |
+| `--size <n>` | 10 | Items per page for history listing |
+| `--verbose` | false | Show detailed output or return raw API response |
 
 ---
 
@@ -92,18 +95,21 @@ List actionable optimization tasks for a site.
 
 ```bash
 aisee actions https://example.com
-aisee actions https://example.com --status pending --size 20
+aisee actions https://example.com --module presence --status pending
 aisee actions https://example.com --format json
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `<url>` | required | Website URL |
+| `--module <name>` | — | Filter by module: `presence`, `competitor`, `strategy` |
 | `--page <n>` | 1 | Page number |
 | `--size <n>` | 10 | Items per page (max 1000) |
 | `--sort-by <field>` | `position` | Sort field |
 | `--sort-order <asc\|desc>` | `asc` | Sort direction |
 | `--status <s>` | — | Filter by status: `pending`, `in_progress`, `completed` |
+| `--has-solution` | false | Filter by has solution |
+| `--verbose` | false | Show detailed output or return raw API response |
 
 ### `aisee action-detail <action-id>`
 Show the full details of a single action task: metadata, description, and all solution steps.
@@ -135,6 +141,7 @@ aisee action-post abc-123
 | Flag | Default | Description |
 |---|---|---|
 | `<action-id>` | required | Action ID |
+| `--channel-id <id>` | — | Only post to this channel ID |
 
 ---
 
@@ -162,14 +169,16 @@ List recent posts with optional status filter.
 
 ```bash
 aisee post list
-aisee post list --state DRAFT --limit 20
+aisee post list --state DRAFT --size 20
 aisee post list --format json
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--state <s>` | — | `DRAFT`, `QUEUE`, `PUBLISHED`, `ERROR` |
-| `--limit <n>` | 10 | Number of posts to return (max 100) |
+| `--page <n>` | 1 | Page number |
+| `--size <n>` | 10 | Items per page (max 100) |
+| `--verbose` | false | Show detailed output or return raw API response |
 
 ### `aisee post dashboard`
 View social media engagement and traffic metrics.

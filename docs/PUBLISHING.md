@@ -13,7 +13,7 @@ AISee CLI follows a **hybrid distribution** strategy:
   bin/aisee.js               ← The CLI entry point (runs on Node/Bun)
 ```
 
-Users installing via `npm install -g @aisee/aisee` get the lightweight JS bundle.
+Users installing via `npm install -g @aisee/aisee@latest` get the lightweight JS bundle.
 
 ---
 
@@ -43,7 +43,7 @@ sh scripts/publish.sh
 ### 3. Verify the install
 
 ```bash
-npm install -g @aisee/aisee
+npm install -g @aisee/aisee@latest
 aisee --version
 ```
 

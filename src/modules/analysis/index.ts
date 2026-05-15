@@ -6,7 +6,7 @@ import { productUrlSchema, normalizeProductUrl } from "../../utils/url.ts";
 import { UserError } from "../../utils/errors.ts";
 import { isDebug } from "../../utils/log-level.ts";
 import { getOutputFormat, isPresentationFormat } from "../../utils/format.ts";
-import { renderMarkdownToTui, colors as tuiColors } from "../../utils/tui.ts";
+import { renderMarkdownToTui, colors as tuiColors, visibleLength, getTerminalWidth } from "../../utils/tui.ts";
 
 function dbg(msg: string, data?: unknown): void {
   if (!isDebug()) return;
@@ -1348,34 +1348,34 @@ function formatTaskResultMarkdown(data: Record<string, unknown>): string {
   return parts.join("\n").replace(/\n+$/, "") + "\n";
 }
 
-const RULE = "─".repeat(72);
+const RULE = tuiColors.dim("─".repeat(72));
 
 function statusTableGlyph(status: string): string {
-  if (status === "completed") return "✓";
-  if (status === "failed") return "✗";
-  return "○";
+  if (status === "completed" || status === "done") return tuiColors.green("✓");
+  if (status === "failed") return tuiColors.red("✗");
+  return tuiColors.gray("○");
 }
 
 function formatCodeBox(code: string): string {
-  const divider = "  " + "─".repeat(68);
-  const lines = code.split("\n").map(l => `  ${l}`);
+  const divider = tuiColors.dim("      " + "─".repeat(64));
+  const lines = code.split("\n").map(l => `      ${l}`);
   return [divider, ...lines, divider].join("\n");
 }
 
 function renderTaskBody(task: TaskItem, parts: string[]): void {
   if (task.content) {
-    parts.push("CONTENT");
-    String(task.content).trim().split("\n").forEach(l => parts.push(`  ${l}`));
+    parts.push("    " + tuiColors.cyan("CONTENT"));
+    String(task.content).trim().split("\n").forEach(l => parts.push(`      ${l}`));
     parts.push("");
   }
   if (task.code) {
-    parts.push("CODE EXAMPLE");
+    parts.push("    " + tuiColors.cyan("CODE EXAMPLE"));
     parts.push(formatCodeBox(String(task.code)));
     parts.push("");
   }
   if (Array.isArray(task.steps) && task.steps.length > 0) {
-    parts.push("STEPS");
-    (task.steps as unknown[]).forEach((step, n) => parts.push(`  ${n + 1}. ${String(step)}`));
+    parts.push("    " + tuiColors.cyan("STEPS"));
+    (task.steps as unknown[]).forEach((step, n) => parts.push(`      ${tuiColors.orange(`${n + 1}.`)} ${String(step)}`));
     parts.push("");
   }
 }
@@ -1391,27 +1391,40 @@ function formatSuggestTable(data: Record<string, unknown>, action: Record<string
   const actionStatus = action ? String(action.status ?? "") : "";
   const scoreLabel = action ? String(action.analysis_cat ?? "") : "";
 
+  const width = getTerminalWidth();
   const parts: string[] = [];
-  parts.push(`ACTIONS.SUGGEST  ${statusTableGlyph(overallStatus)} ${overallStatus}`);
+  parts.push(`${tuiColors.dim("[ACTIONS]")} ${tuiColors.lime.bold("SUGGEST")}  ${statusTableGlyph(overallStatus)} ${tuiColors.white(overallStatus)}`);
   parts.push(RULE, "");
 
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
-    const typeStr = task.type ? `[${String(task.type).toUpperCase()}]` : "";
-    const diffStr = difficulty ? `[${difficulty}]` : "";
-    const starsStr = Number.isFinite(impactRating) && impactRating > 0 ? formatStars(impactRating) : "";
-    const typeLine = [typeStr, diffStr, starsStr].filter(Boolean).join(" ");
+    const taskSn = tuiColors.orange.bold(`TASK #${i + 1}`);
+    const taskTitleStyled = tuiColors.white.bold(String(task.title ?? ""));
+    
+    const typeStr = task.type ? tuiColors.dim(`[${String(task.type).toUpperCase()}]`) : "";
+    const diffStr = difficulty ? difficultyColor(difficulty.toLowerCase())(`[${difficulty}]`) : "";
+    const starsStr = Number.isFinite(impactRating) && impactRating > 0 ? tuiColors.gold(formatStars(impactRating)) : "";
+    const right = [typeStr, diffStr, starsStr].filter(Boolean).join("  ");
+    
+    const headerLeft = `${taskSn}  ${taskTitleStyled}`;
+    const gap = Math.max(2, width - visibleLength(headerLeft) - visibleLength(right));
+    parts.push(headerLeft + " ".repeat(gap) + right);
 
-    parts.push(`TASK #${i + 1}`);
-    parts.push(`title    ${String(task.title ?? "")}`);
-    if (typeLine) parts.push(`type     ${typeLine}`);
+    const metaParts: string[] = [];
     if (scoreLabel && Number.isFinite(currentScore) && Number.isFinite(expectedScore)) {
       const delta = expectedScore - currentScore;
-      parts.push(`score    ${scoreLabel}  ${currentScore.toFixed(1)} → ${expectedScore.toFixed(1)} (+${delta.toFixed(1)})`);
+      const deltaStr = delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
+      const deltaColor = delta > 0 ? tuiColors.green : tuiColors.dim;
+      metaParts.push(`${tuiColors.cyan(scoreLabel)} ${tuiColors.white(currentScore.toFixed(1))} ${tuiColors.dim("→")} ${tuiColors.white(expectedScore.toFixed(1))} ${deltaColor(`(${deltaStr})`)}`);
     }
-    if (actionStatus) parts.push(`status   ${statusTableGlyph(actionStatus)} ${actionStatus}`);
-    parts.push(RULE, "");
-
+    if (actionStatus) {
+      metaParts.push(statusTableGlyph(actionStatus) + " " + tuiColors.white(actionStatus));
+    }
+    if (metaParts.length > 0) {
+      parts.push(tuiColors.dim("  ↳ ") + metaParts.join(tuiColors.dim(" · ")));
+    }
+    
+    parts.push("");
     renderTaskBody(task, parts);
 
     if (i < tasks.length - 1) parts.push(RULE, "");
@@ -1430,35 +1443,44 @@ function formatActionDetailTable(action: Record<string, unknown>): string {
   const solutions = Array.isArray(action.solution_data) ? action.solution_data as TaskItem[] : [];
   const primaryType = solutions[0]?.type ? String(solutions[0].type).toUpperCase() : "";
 
+  const width = getTerminalWidth();
   const parts: string[] = [];
-  parts.push(`ACTIONS.DETAIL  ${statusTableGlyph(actionStatus)} ${actionStatus}`);
+  parts.push(`${tuiColors.dim("[ACTIONS]")} ${tuiColors.lime.bold("DETAIL")}  ${statusTableGlyph(actionStatus)} ${tuiColors.white(actionStatus)}`);
   parts.push(RULE, "");
 
-  const typeStr = primaryType ? `[${primaryType}]` : "";
-  const diffStr = difficulty ? `[${difficulty}]` : "";
-  const starsStr = Number.isFinite(impactRating) && impactRating > 0 ? formatStars(impactRating) : "";
-  const typeLine = [typeStr, diffStr, starsStr].filter(Boolean).join(" ");
+  const taskSn = tuiColors.orange.bold(`TASK #${String(action.sn ?? 1)}`);
+  const taskTitleStyled = tuiColors.white.bold(String(action.title ?? ""));
 
-  parts.push(`TASK #${String(action.sn ?? 1)}`);
-  parts.push(`title    ${String(action.title ?? "")}`);
-  if (typeLine) parts.push(`type     ${typeLine}`);
+  const typeStr = primaryType ? tuiColors.dim(`[${primaryType}]`) : "";
+  const diffStr = difficulty ? difficultyColor(difficulty.toLowerCase())(`[${difficulty}]`) : "";
+  const starsStr = Number.isFinite(impactRating) && impactRating > 0 ? tuiColors.gold(formatStars(impactRating)) : "";
+  const right = [typeStr, diffStr, starsStr].filter(Boolean).join("  ");
+
+  const headerLeft = `${taskSn}  ${taskTitleStyled}`;
+  const gap = Math.max(2, width - visibleLength(headerLeft) - visibleLength(right));
+  parts.push(headerLeft + " ".repeat(gap) + right);
+
+  const metaParts: string[] = [];
   if (scoreLabel && Number.isFinite(currentScore) && Number.isFinite(expectedScore)) {
     const delta = expectedScore - currentScore;
-    parts.push(`score    ${scoreLabel}  ${currentScore.toFixed(1)} → ${expectedScore.toFixed(1)} (+${delta.toFixed(1)})`);
+    const deltaStr = delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
+    const deltaColor = delta > 0 ? tuiColors.green : tuiColors.dim;
+    metaParts.push(`${tuiColors.cyan(scoreLabel)} ${tuiColors.white(currentScore.toFixed(1))} ${tuiColors.dim("→")} ${tuiColors.white(expectedScore.toFixed(1))} ${deltaColor(`(${deltaStr})`)}`);
   }
-  parts.push(`status   ${statusTableGlyph(actionStatus)} ${actionStatus}`);
+  metaParts.push(statusTableGlyph(actionStatus) + " " + tuiColors.white(actionStatus));
+  parts.push(tuiColors.dim("  ↳ ") + metaParts.join(tuiColors.dim(" · ")));
   parts.push(RULE, "");
 
   if (action.description) {
-    parts.push("DESCRIPTION");
-    String(action.description).trim().split("\n").forEach(l => parts.push(`  ${l}`));
+    parts.push("    " + tuiColors.cyan("DESCRIPTION"));
+    String(action.description).trim().split("\n").forEach(l => parts.push(`      ${l}`));
     parts.push("");
   }
 
   solutions.forEach((task, i) => {
     if (solutions.length > 1) {
-      const type = task.type ? `[${String(task.type).toUpperCase()}]` : "";
-      parts.push(`SOLUTION #${i + 1}  ${type}  ${task.title ?? ""}`.trimEnd(), "");
+      const type = task.type ? tuiColors.dim(`[${String(task.type).toUpperCase()}]`) : "";
+      parts.push(`${tuiColors.orange.bold(`SOLUTION #${i + 1}`)}  ${type}  ${tuiColors.white.bold(task.title ?? "")}`.trimEnd(), "");
     }
     renderTaskBody(task, parts);
     if (i < solutions.length - 1) parts.push(RULE, "");

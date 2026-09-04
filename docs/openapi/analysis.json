@@ -6,6 +6,56 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/task/analyzer-models": {
+      "get": {
+        "summary": "Get Analyzer Models",
+        "description": "Get the analyzer models available under the user's subscription template.\n\nReturns the per-provider models configured under code_ai_presence_analyzer\nand code_ai_competitor_analyzer, i.e. the defaults an analysis runs with\nwhen no ``model_overrides`` is supplied. The frontend uses this to show the\ncurrent selection and prefill the model picker.\n\nWhen ``product_id`` is provided (UUID, URL or bare domain), the response\nalso carries ``latest_task``: the models the product's most recent analysis\nactually ran with, which may differ from the template if that run used\n``model_overrides``. It is ``None`` when the product has no task yet.",
+        "operationId": "get_analyzer_models_task_analyzer_models_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task/create": {
       "post": {
         "summary": "Create Task",
@@ -733,6 +783,59 @@
         }
       }
     },
+    "/task/reconcile-tree/{task_id}": {
+      "post": {
+        "summary": "Reconcile Task Tree",
+        "description": "Reconcile a task tree with its latest template (admin edit action).\n\nSoft-deletes tasks whose code no longer exists in the template, prunes the\nstale dependency edges that pointed at those codes, and re-syncs surviving\ntasks' model/schemas. This lets a tree that was orphaned by a template\nchange (for example a delisted model) complete without re-running finished\nwork.\n\nRe-running the tree stays a separate action (`/analyze-task`). Pass\n`dry_run=true` (default) to preview the plan before applying it.",
+        "operationId": "reconcile_task_tree_task_reconcile_tree__task_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Dry Run"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task/estimate-cost": {
       "post": {
         "summary": "Estimate Task Cost",
@@ -968,6 +1071,48 @@
         ]
       }
     },
+    "/product/create-with-review": {
+      "post": {
+        "summary": "Create With Review",
+        "description": "First-product entry point: create the product and store a lightweight,\nnon-AI WebReviewAnalyzer preview at product.result.preview.\n\nAccepts the same fields as /create. Requires no subscription and creates\nno Task record. Running the full AEO analysis stays a separate call to\n/task/analyze-product.\n\nOnly valid for a user's very first product — once any product exists for\nthis user, callers should use /preview + /create instead.",
+        "operationId": "create_with_review_product_create_with_review_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/product/create": {
       "post": {
         "summary": "Create",
@@ -1013,7 +1158,7 @@
     "/product": {
       "get": {
         "summary": "Get Products",
-        "description": "Get all products with pagination and optional filtering.\n\nQuery Parameters:\n- name: Product name or URL pattern (auto-detected in to_filter_dict)\n  - If it looks like a URL (e.g., \"apple.com\"), searches url field\n  - Otherwise, searches name field\n- url: Product URL (takes precedence over name if both provided)\n- Other standard filter parameters: id, user_id, status, product_type",
+        "description": "Get all products with pagination and optional filtering.\n\nQuery Parameters:\n- name: Product name or URL pattern (auto-detected in to_filter_dict)\n  - If it looks like a URL (e.g., \"apple.com\"), searches url field\n  - Otherwise, searches name field\n- url: Product URL (takes precedence over name if both provided)\n- Other standard filter parameters: id, user_id, status, is_active, product_type",
         "operationId": "get_products_product_get",
         "security": [
           {
@@ -1125,6 +1270,22 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
             }
           },
           {
@@ -2170,7 +2331,7 @@
       },
       "delete": {
         "summary": "Delete Task Template",
-        "description": "Delete a task template",
+        "description": "Delete a task template and its children recursively",
         "operationId": "delete_task_template_task_template__template_id__delete",
         "security": [
           {
@@ -2240,6 +2401,61 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Task Template Tree Task Template  Template Id  Tree Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-template/{template_id}/change_model": {
+      "put": {
+        "summary": "Change Task Template Model",
+        "description": "Change the model of a task template using a true Delete + Create pattern:\n\nDELETE phase (mirrors delete_task_template):\n  - Find all templates that reference old_code in dependencies or schemas.weights.\n  - Save their reference details (dep entry, weight value) for the CREATE phase.\n  - Remove old_code from each referencing template's dependencies and schemas.weights.\n  - Delete the old template record.\n\nCREATE phase (mirrors create_child_task_template):\n  - Derive new code and name by replacing the model short-name suffix.\n  - Create a new template record from the saved snapshot with the new model/code/name.\n  - Re-add new_code to each previously-referencing template's dependencies and schemas.weights.",
+        "operationId": "change_task_template_model_task_template__template_id__change_model_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskTemplateChangeModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTemplateResponse"
                 }
               }
             }
@@ -2901,6 +3117,32 @@
         ]
       }
     },
+    "/config/models": {
+      "get": {
+        "summary": "Get Selectable Models",
+        "description": "List AI models available for per-analysis model overrides.\n\nReturns the enabled models from the MODELS config, excluding internal\naggregation providers (e.g. \"aisee\"). Any authenticated user can call this\nso the frontend can populate a model picker for ``model_overrides``.",
+        "operationId": "get_selectable_models_config_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Selectable Models Config Models Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/config/add-model": {
       "post": {
         "summary": "Add Model",
@@ -3175,7 +3417,7 @@
             }
           },
           {
-            "name": "has_solution_data",
+            "name": "has_solution",
             "in": "query",
             "required": false,
             "schema": {
@@ -3187,7 +3429,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Has Solution Data"
+              "title": "Has Solution"
             }
           }
         ],
@@ -4710,6 +4952,27 @@
         }
       }
     },
+    "/subscription/plans": {
+      "get": {
+        "summary": "Get Subscription Plans",
+        "description": "Public endpoint: subscription tier benefits for the pricing page.\n\nReturns, per purchasable tier, the product count limit (None = unlimited)\nand the active subscription packages (credits and price per billing\ninterval). Only tiers that still have at least one active package are\nlisted: ``SubscriptionTier`` keeps legacy tiers so pre-existing\nsubscriptions keep resolving, but a tier nobody can buy anymore must not\nreach the pricing page. No authentication required.",
+        "operationId": "get_subscription_plans_subscription_plans_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Subscription Plans Subscription Plans Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/subscription/checkout": {
       "post": {
         "summary": "Checkout Subscription",
@@ -5317,6 +5580,78 @@
             }
           }
         }
+      }
+    },
+    "/transaction/business-consumption": {
+      "get": {
+        "summary": "Get Business Consumption",
+        "description": "Get the current user's credit consumption per business module.\n\nConsumption is summed over the user's current subscription period for three\nchannels: postiz and engage (postiz_consumption display records) and\ninternal_credit (task_consumption_tree records). Returns all-zero amounts\nwhen the user has no active subscription period.",
+        "operationId": "get_business_consumption_transaction_business_consumption_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessConsumptionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/transaction/business-consumption/cumulative": {
+      "get": {
+        "summary": "Get Cumulative Business Consumption",
+        "description": "Get the current user's all-time cumulative consumption per business module.\n\nSums every successful consumption display record over the user's whole\nhistory, independent of any subscription period. Module keys map to business\nsegments as Analysis=internal_credit, Post=postiz, Engage=engage.",
+        "operationId": "get_cumulative_business_consumption_transaction_business_consumption_cumulative_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CumulativeBusinessConsumptionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/transaction/topup-credit-stats": {
+      "get": {
+        "summary": "Get Topup Credit Stats",
+        "description": "Get the current user's cumulative (all-time) top-up credit stats.\n\nReturns total top-up credits granted and total consumption funded by top-up\ncredits. Both are all-time figures, independent of the subscription period.\n``total_consumed`` is the top-up-funded slice of all consumption, so it must\nnot be summed with the per-module consumption from /business-consumption.",
+        "operationId": "get_topup_credit_stats_transaction_topup_credit_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopUpCreditStatsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/transaction/{transaction_id}": {
@@ -6122,6 +6457,70 @@
         }
       }
     },
+    "/admin/subscription/missed-upgrades": {
+      "get": {
+        "summary": "List Missed Upgrades",
+        "description": "List subscription-upgrade invoices charged in Stripe but never applied to the DB.",
+        "operationId": "list_missed_upgrades_admin_subscription_missed_upgrades_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/admin/subscription/backfill": {
+      "post": {
+        "summary": "Backfill Missed Upgrades",
+        "description": "Replay missed subscription-upgrade invoices through the real handler. dry_run=True by default.",
+        "operationId": "backfill_missed_upgrades_admin_subscription_backfill_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/post-agent/integration/update": {
       "post": {
         "summary": "Update Integration Data",
@@ -6166,6 +6565,599 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/post-agent/operation-plan/callback": {
+      "post": {
+        "summary": "Operation Plan Callback",
+        "description": "Record a terminal operation-plan outcome pushed by Postiz.\n\nPrimarily covers the generation-failure path, which produces no billing and\ntherefore no credit-deduct confirm callback (the success path is reflected\nthere instead). Idempotent and best-effort: an unknown product is a no-op.",
+        "operationId": "operation_plan_callback_post_agent_operation_plan_callback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationPlanCallbackReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Operation Plan Callback Post Agent Operation Plan Callback Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/gsc/oauth/start": {
+      "get": {
+        "summary": "Oauth Start",
+        "description": "Create an OAuth state bound to the current user and return the Google URL.",
+        "operationId": "oauth_start_gsc_oauth_start_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "/search-console",
+              "title": "Returnto"
+            }
+          },
+          {
+            "name": "switchAccount",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Switchaccount"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Oauth Start Gsc Oauth Start Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gsc/oauth/callback": {
+      "get": {
+        "summary": "Oauth Callback",
+        "description": "Handle Google's redirect: exchange the code and persist credentials per user.",
+        "operationId": "oauth_callback_gsc_oauth_callback_get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gsc/disconnect": {
+      "post": {
+        "summary": "Disconnect",
+        "description": "Remove the user's stored GSC credentials.",
+        "operationId": "disconnect_gsc_disconnect_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Disconnect Gsc Disconnect Post"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/gsc/status": {
+      "get": {
+        "summary": "Status",
+        "description": "Connection state machine: never_connected / connected / revoked.",
+        "operationId": "status_gsc_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Status Gsc Status Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/gsc/properties": {
+      "get": {
+        "summary": "Properties",
+        "description": "List the user's verified Search Console properties.",
+        "operationId": "properties_gsc_properties_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Properties Gsc Properties Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/gsc/summary": {
+      "get": {
+        "summary": "Summary",
+        "description": "Aggregate metrics for the requested period.",
+        "operationId": "summary_gsc_summary_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "property",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Property"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "28d",
+              "title": "Range"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "web",
+              "title": "Type"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Summary Gsc Summary Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gsc/timeseries": {
+      "get": {
+        "summary": "Timeseries",
+        "description": "Daily metrics series for the requested period.",
+        "operationId": "timeseries_gsc_timeseries_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "property",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Property"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "28d",
+              "title": "Range"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "web",
+              "title": "Type"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Timeseries Gsc Timeseries Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gsc/top": {
+      "get": {
+        "summary": "Top",
+        "description": "Ranked rows for a single dimension (query/page/device/country).",
+        "operationId": "top_gsc_top_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "property",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Property"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "28d",
+              "title": "Range"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "web",
+              "title": "Type"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "dimension",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dimension"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Top Gsc Top Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/health": {
@@ -6424,6 +7416,79 @@
         "title": "AlertsResponse",
         "description": "Alerts check response"
       },
+      "AnalyzerModelOverride": {
+        "properties": {
+          "ai_presence_analyzer": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Presence Analyzer"
+          },
+          "ai_competitor_analyzer": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Competitor Analyzer"
+          }
+        },
+        "type": "object",
+        "title": "AnalyzerModelOverride",
+        "description": "Per-request override of the analyzer models for an analysis run.\n\nDeclarative \"desired set\": each field lists the full ``provider/model``\nidentifiers that should run for that analyzer group this run. A provider\nmay appear more than once (e.g. two different Anthropic models) as long as\nthe full ``provider/model`` strings are distinct. The backend diffs the\nlist against the subscription template (the default), matching entries to\nexisting children of the same provider positionally, and adds, removes, or\nswaps analyzer tasks accordingly:\n- a template model with no corresponding entry left in the list is removed,\n- a list entry with no corresponding existing child is added,\n- a template model paired with a different desired model (same provider,\n  same position) is swapped in place.\n\nOnly the two fan-out analyzer groups are adjustable. Leave a field as\n``None`` to keep the template default for that group; an empty list is\nrejected because an analyzer group must keep at least one model."
+      },
+      "BackfillRequest": {
+        "properties": {
+          "subscription_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscription Id"
+          },
+          "invoice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Id"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": true
+          },
+          "max_apply": {
+            "type": "integer",
+            "title": "Max Apply",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "title": "BackfillRequest"
+      },
       "BonusGrantRequest": {
         "properties": {
           "user_id": {
@@ -6438,7 +7503,8 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "Amount",
@@ -6468,6 +7534,87 @@
         ],
         "title": "BonusGrantRequest",
         "description": "Request model for granting bonus credits"
+      },
+      "BusinessConsumptionResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "has_subscription": {
+            "type": "boolean",
+            "title": "Has Subscription",
+            "description": "False when the user has no active/pending subscription period"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start",
+            "description": "Subscription period start (inclusive)"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End",
+            "description": "Subscription period end (inclusive)"
+          },
+          "consumption": {
+            "$ref": "#/components/schemas/BusinessModuleConsumption"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "has_subscription",
+          "consumption"
+        ],
+        "title": "BusinessConsumptionResponse",
+        "description": "Per-user business-module consumption over the current subscription period."
+      },
+      "BusinessModuleConsumption": {
+        "properties": {
+          "postiz": {
+            "type": "string",
+            "title": "Postiz",
+            "description": "Postiz post module consumption",
+            "default": "0"
+          },
+          "engage": {
+            "type": "string",
+            "title": "Engage",
+            "description": "Postiz engage module consumption",
+            "default": "0"
+          },
+          "internal_credit": {
+            "type": "string",
+            "title": "Internal Credit",
+            "description": "Internal core analysis consumption (task_consumption_tree)",
+            "default": "0"
+          },
+          "total": {
+            "type": "string",
+            "title": "Total",
+            "description": "Sum of all module consumption",
+            "default": "0"
+          }
+        },
+        "type": "object",
+        "title": "BusinessModuleConsumption",
+        "description": "Credit consumption per business module within a subscription period.\n\nAll amounts are positive decimal strings (consumed credits)."
       },
       "ConfigChangeFieldValues": {
         "properties": {
@@ -6573,6 +7720,7 @@
           },
           "amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount",
             "default": "0"
           }
@@ -6914,7 +8062,8 @@
                 "minimum": 0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "Price",
@@ -6932,7 +8081,8 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "Credits",
@@ -7010,7 +8160,8 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               }
             ],
             "title": "Credits",
@@ -7073,7 +8224,8 @@
                 "minimum": 0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -7089,7 +8241,8 @@
                 "exclusiveMinimum": 0
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -7164,6 +8317,24 @@
         ],
         "title": "CreditSource",
         "description": "Credit source type enumeration"
+      },
+      "CumulativeBusinessConsumptionResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "consumption": {
+            "$ref": "#/components/schemas/BusinessModuleConsumption"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "consumption"
+        ],
+        "title": "CumulativeBusinessConsumptionResponse",
+        "description": "Per-user all-time cumulative business-module consumption.\n\nIndependent of the subscription period: sums every successful consumption\ndisplay record over the user's whole history. Module keys map to business\nsegments as Analysis=internal_credit, Post=postiz, Engage=engage."
       },
       "CustomerPortalRequest": {
         "properties": {
@@ -7428,6 +8599,42 @@
         "title": "NewUserTrendPoint",
         "description": "Single data point for new user trend"
       },
+      "OperationPlanCallbackReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "Aisee product id (Postiz projectId)"
+          },
+          "plan_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Id",
+            "description": "Postiz operation plan id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "title": "Status",
+            "description": "Terminal operation-plan status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "status"
+        ],
+        "title": "OperationPlanCallbackReq"
+      },
       "PaginatedResponse": {
         "properties": {
           "items": {
@@ -7469,17 +8676,6 @@
             "type": "string",
             "title": "Product Id"
           },
-          "task_template_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Template Id"
-          },
           "stream": {
             "anyOf": [
               {
@@ -7503,6 +8699,16 @@
             ],
             "title": "Use Demo",
             "default": false
+          },
+          "model_overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyzerModelOverride"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7748,10 +8954,15 @@
             "type": "string",
             "title": "Product Id"
           },
-          "task_template_id": {
-            "type": "string",
-            "title": "Task Template Id",
-            "default": ""
+          "model_overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyzerModelOverride"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7857,13 +9068,26 @@
             ],
             "title": "Status"
           },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "description": "Activation switch; False disables all actions on this product"
+          },
           "score": {
             "anyOf": [
               {
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
               },
               {
                 "type": "null"
@@ -8026,6 +9250,7 @@
           },
           "amount": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Amount",
             "default": "0"
           },
@@ -8057,6 +9282,7 @@
           },
           "total_revenue": {
             "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Revenue",
             "default": "0"
           },
@@ -8253,6 +9479,16 @@
             ],
             "title": "Use Demo",
             "default": false
+          },
+          "model_overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyzerModelOverride"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8260,21 +9496,10 @@
           "task_id"
         ],
         "title": "TaskAnalysisRequest",
-        "description": "Create a new task"
+        "description": "Re-execute an existing task tree."
       },
       "TaskCostEstimateRequest": {
         "properties": {
-          "task_template_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Template Id"
-          },
           "product_id": {
             "anyOf": [
               {
@@ -8296,11 +9521,36 @@
               }
             ],
             "title": "Task Id"
+          },
+          "model_overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyzerModelOverride"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "title": "TaskCostEstimateRequest",
-        "description": "Task cost estimate request\n\nSupports three scenarios:\n1. Empty request: Use default template with mock product data (for general cost estimation)\n2. New task from template: Provide task_template_id and/or product_id\n3. Task copy (re-execution): Provide task_id"
+        "description": "Task cost estimate request\n\nThe analysis template is derived from the user's subscription tier; it can no\nlonger be supplied by the caller. Supports three scenarios:\n1. Empty request: Use the subscription tier template with mock product data\n2. New task: Provide product_id\n3. Task copy (re-execution): Provide task_id"
+      },
+      "TaskExecutionsOverview": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "status_distribution": {
+            "$ref": "#/components/schemas/TaskStatusDistribution"
+          }
+        },
+        "type": "object",
+        "title": "TaskExecutionsOverview",
+        "description": "All-task (root + children) raw counts for capacity/ops observability.\n\nDistinct from the parent `TaskOverview` which is scoped to root tasks\n(analysis-level). Use this when you need to see total execution volume\nincluding individual sub-task statuses."
       },
       "TaskHealthCheckRequest": {
         "properties": {
@@ -8366,11 +9616,15 @@
             "type": "integer",
             "title": "Today Failed",
             "default": 0
+          },
+          "executions": {
+            "$ref": "#/components/schemas/TaskExecutionsOverview",
+            "description": "Raw counts over ALL tasks (includes children) for capacity observability"
           }
         },
         "type": "object",
         "title": "TaskOverview",
-        "description": "Task statistics overview"
+        "description": "Task statistics overview (ROOT tasks only — one root = one analysis job).\n\nChild task counts live in the nested `executions` field."
       },
       "TaskResponse": {
         "properties": {
@@ -8602,6 +9856,20 @@
         "title": "TaskStatusDistribution",
         "description": "Task count by status"
       },
+      "TaskTemplateChangeModel": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "title": "TaskTemplateChangeModel",
+        "description": "Change the model of a task template. Code and name are auto-derived."
+      },
       "TaskTemplateCreate": {
         "properties": {
           "parent_id": {
@@ -8645,6 +9913,17 @@
             "type": "boolean",
             "title": "Has Children",
             "default": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "schemas": {
             "anyOf": [
@@ -8730,6 +10009,17 @@
           "has_children": {
             "type": "boolean",
             "title": "Has Children"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "schemas": {
             "anyOf": [
@@ -8846,6 +10136,17 @@
             ],
             "title": "Has Children"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "schemas": {
             "anyOf": [
               {
@@ -8942,6 +10243,38 @@
         "type": "object",
         "title": "TaskUpdate",
         "description": "Update task status and progress"
+      },
+      "TopUpCreditStatsResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "total_granted": {
+            "type": "string",
+            "title": "Total Granted",
+            "description": "All-time top-up credits granted (gross)",
+            "default": "0"
+          },
+          "total_debt_repaid": {
+            "type": "string",
+            "title": "Total Debt Repaid",
+            "description": "Portion of granted credits diverted to debt repayment",
+            "default": "0"
+          },
+          "total_consumed": {
+            "type": "string",
+            "title": "Total Consumed",
+            "description": "All-time consumption funded by top-up credits",
+            "default": "0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "TopUpCreditStatsResponse",
+        "description": "Per-user cumulative (all-time) top-up credit grant and consumption.\n\nBoth figures are all-time and independent of the subscription period.\n``total_consumed`` is the top-up-funded slice of all consumption, so it must\nnot be summed with the per-module consumption totals.\n\nWhen users have outstanding debt, a portion of each credit_top_up_grant is\ndiverted to repay that debt before the remainder lands in the credit_balances\ntable. ``total_debt_repaid`` tracks that diverted amount so the frontend can\nreconcile::\n\n    expected_balance = total_granted - total_debt_repaid - total_consumed"
       },
       "UserChangePassword": {
         "properties": {
@@ -9118,6 +10451,11 @@
               }
             ],
             "title": "Updated At"
+          },
+          "product_count": {
+            "type": "integer",
+            "title": "Product Count",
+            "default": 0
           },
           "amount_available": {
             "type": "string",

@@ -9,6 +9,7 @@ import { emitErrorTty, emitErrorJson } from "./utils/emit-error.ts";
 import { loginModule, logoutModule, whoamiModule } from "./modules/auth.ts";
 import {
   scanModule,
+  modelsModule,
   reportModule,
   actionsListModule,
   actionsSuggestModule,
@@ -126,6 +127,7 @@ async function main() {
   const registry = new Registry();
   registry.register("scan", scanModule);
   registry.register("report", reportModule);
+  registry.register("models", modelsModule);
   registry.register("auth.login", loginModule);
   registry.register("auth.logout", logoutModule);
   registry.register("auth.whoami", whoamiModule);
@@ -177,6 +179,8 @@ async function main() {
     withVerbose(buildAiseeCommand(makeDescriptor("report", reportModule), executor, 1000, "report")),
     "url",
   ));
+
+  program.addCommand(buildAiseeCommand(makeDescriptor("models", modelsModule), executor, 1000, "models"));
 
   // auth — promoted to top-level per product spec
   program.addCommand(buildAiseeCommand(makeDescriptor("auth.login", loginModule), executor, 1000, "login"));

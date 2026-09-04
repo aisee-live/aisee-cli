@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { analysisClient, type SuggestionResult, type TaskTreeNode } from "../../clients/analysis.ts";
+import { analysisClient, type AnalyzerModelOverride, type SuggestionResult, type TaskTreeNode } from "../../clients/analysis.ts";
 import { postAgentClient } from "../../clients/post-agent.ts";
 import { loadCredentials } from "../../utils/config.ts";
 import { productUrlSchema, normalizeProductUrl } from "../../utils/url.ts";
+import { isProjectId } from "../../utils/project.ts";
 import { UserError } from "../../utils/errors.ts";
 import { isDebug } from "../../utils/log-level.ts";
 import { getOutputFormat, isPresentationFormat } from "../../utils/format.ts";
@@ -88,6 +89,16 @@ function formatKeyValueTable(obj: Record<string, unknown>): string {
 
 function escapeMdCell(text: string): string {
   return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function formatColumnTable(rows: Record<string, unknown>[]): string {
+  if (rows.length === 0) return "(none)";
+  const keys = Object.keys(rows[0]!);
+  const widths = keys.map(k => Math.max(k.length, ...rows.map(r => String(r[k] ?? "").length)));
+  const sep = widths.map(w => "-".repeat(w)).join("  ");
+  const header = keys.map((k, i) => k.padEnd(widths[i]!)).join("  ");
+  const lines = rows.map(r => keys.map((k, i) => String(r[k] ?? "").padEnd(widths[i]!)).join("  "));
+  return [header, sep, ...lines].join("\n");
 }
 
 function mdKeyValueTable(obj: Record<string, unknown>): string {
@@ -791,6 +802,84 @@ function isModulePresentationFormat(fmt: string): boolean {
   return fmt === "table" || fmt === "markdown" || fmt === "tui";
 }
 
+function splitModels(value: unknown): string[] | undefined {
+  if (typeof value !== "string") return undefined;
+  const parts = value.split(",").map(v => v.trim()).filter(Boolean);
+  // An empty group is rejected server-side: an analyzer must keep one model.
+  return parts.length > 0 ? parts : undefined;
+}
+
+function buildModelOverrides(input: any): AnalyzerModelOverride | undefined {
+  const presence = splitModels(input.presence_models);
+  const competitor = splitModels(input.competitor_models);
+  if (!presence && !competitor) return undefined;
+  return {
+    ...(presence ? { ai_presence_analyzer: presence } : {}),
+    ...(competitor ? { ai_competitor_analyzer: competitor } : {}),
+  };
+}
+
+const ANALYZER_GROUP_LABELS: Record<string, string> = {
+  ai_presence_analyzer: "AI Presence",
+  ai_competitor_analyzer: "Competitor Landscape",
+};
+
+function analyzerGroupRows(group: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(group)) return [];
+  return group.map((m: any) => ({
+    provider: m.provider ?? "",
+    model: m.model ?? "",
+    id: m.full_name ?? "",
+  }));
+}
+
+export const modelsModule = {
+  description: "Show the analyzer models an analysis runs with",
+  inputSchema: z.object({
+    project: z.string().optional().describe("Also show what this product's latest analysis actually ran with"),
+  }),
+  outputSchema: z.any(),
+  async execute(input: any) {
+    const data = await analysisClient.getAnalyzerModels(input.project) as Record<string, unknown>;
+    const fmt = getEffectiveFormat();
+    if (fmt !== "table" && fmt !== "markdown" && fmt !== "tui") return data;
+
+    const groups = Object.keys(ANALYZER_GROUP_LABELS)
+      .map(key => ({ key, label: ANALYZER_GROUP_LABELS[key]!, rows: analyzerGroupRows(data[key]) }))
+      .filter(g => g.rows.length > 0);
+
+    const latest = data.latest_task as Record<string, unknown> | null | undefined;
+
+    if (fmt === "markdown") {
+      const parts: string[] = ["# Analyzer Models", "",
+        "Pass the `id` column to `aisee scan --presence-models` / `--competitor-models`.", ""];
+      for (const g of groups) parts.push(`## ${g.label} (default)`, "", mdRecordTable(g.rows), "");
+      if (latest) {
+        parts.push(`## Last run — version ${latest.version_name ?? "?"} (${latest.status ?? "?"})`, "");
+        for (const key of Object.keys(ANALYZER_GROUP_LABELS)) {
+          const rows = analyzerGroupRows(latest[key]);
+          if (rows.length > 0) parts.push(`### ${ANALYZER_GROUP_LABELS[key]}`, "", mdRecordTable(rows), "");
+        }
+      }
+      return parts.join("\n").replace(/\n+$/, "") + "\n";
+    }
+
+    const blocks: string[] = [];
+    for (const g of groups) {
+      blocks.push(`=== ${g.label} (default) ===\n${formatColumnTable(g.rows)}`);
+    }
+    if (latest) {
+      blocks.push(`=== Last run — version ${latest.version_name ?? "?"} (${latest.status ?? "?"}) ===`);
+      for (const key of Object.keys(ANALYZER_GROUP_LABELS)) {
+        const rows = analyzerGroupRows(latest[key]);
+        if (rows.length > 0) blocks.push(`${ANALYZER_GROUP_LABELS[key]}\n${formatColumnTable(rows)}`);
+      }
+    }
+    blocks.push("Pass an 'id' value to: aisee scan <url> --presence-models <id,...>");
+    return blocks.join("\n\n");
+  }
+};
+
 export const scanModule = {
   description: "Start AEO analysis for a product with complete task orchestration",
   inputSchema: z.object({
@@ -798,12 +887,22 @@ export const scanModule = {
     module: z.string().optional().describe("Specify a module to scan"),
     streaming: z.boolean().default(false).describe("Enable streaming HTTP response from the analysis API"),
     use_demo: z.boolean().default(false).describe("Use demo mode for testing (no credits consumed)"),
+    presence_models: z.string().optional().describe(
+      "Comma-separated provider/model IDs for the AI-presence analyzer (see 'aisee models')"
+    ),
+    competitor_models: z.string().optional().describe(
+      "Comma-separated provider/model IDs for the competitor analyzer (see 'aisee models')"
+    ),
     wait: z.boolean().default(true).describe("Wait for scan results (use --no-wait to return immediately after submitting)")
   }),
   outputSchema: z.any(),
   async execute(input: any) {
     input.url = normalizeProductUrl(input.url);
-    const baseParams = { stream: input.streaming, use_demo: input.use_demo };
+    const baseParams = {
+      stream: input.streaming,
+      use_demo: input.use_demo,
+      model_overrides: buildModelOverrides(input),
+    };
     if (input.wait === false) {
       let data: any;
       if (input.module) {
@@ -876,18 +975,9 @@ export const scanModule = {
     let result: any;
     if (input.module) {
       const analyzerKey = SECTION_TO_ANALYZER_KEY[input.module] ?? input.module;
-      result = await analysisClient.scanModuleAndWait(
-        input.url,
-        analyzerKey,
-        { stream: input.streaming, use_demo: input.use_demo },
-        onTree
-      );
+      result = await analysisClient.scanModuleAndWait(input.url, analyzerKey, baseParams, onTree);
     } else {
-      result = await analysisClient.scanAndWait(
-        input.url,
-        { stream: input.streaming, use_demo: input.use_demo },
-        onTree
-      );
+      result = await analysisClient.scanAndWait(input.url, baseParams, onTree);
     }
 
     if (isTTY && prevLineCount > 0) {
@@ -1629,7 +1719,17 @@ export const actionsPostModule = {
 
     dbg("product_id", productId);
 
-    const product = await analysisClient.getProduct(productId);
+    // `product_id` is the real projectId; the task_id fallback is not, so it is
+    // only used for the product lookup, never sent as a project scope.
+    const projectId = isProjectId(String(action.product_id ?? "")) ? String(action.product_id) : undefined;
+
+    const [product, publishMethods] = await Promise.all([
+      analysisClient.getProduct(productId),
+      postAgentClient.getPublishMethods().catch(() => []),
+    ]);
+    const extensionCapable = new Set(
+      publishMethods.filter((m) => m.extensionCapable).map((m) => m.platform),
+    );
     const configChannels: any[] = product?.config?.channels || [];
 
     dbg("product.config.channels", configChannels.map((c: any) => ({
@@ -1674,7 +1774,40 @@ export const actionsPostModule = {
       const matchingChannels = activeChannels.filter((c: any) => c.identifier === platform);
 
       if (matchingChannels.length === 0) {
-        skippedPlatforms.add(platform);
+        // No connected account. `Post.integrationId` is nullable, so a platform
+        // the extension can publish still gets a post — it carries the platform
+        // in `providerIdentifier` and is sent in-browser. A platform the
+        // extension cannot publish has no executor at all, so skip it.
+        if (!extensionCapable.has(platform)) {
+          skippedPlatforms.add(platform);
+          continue;
+        }
+
+        try {
+          const result = await postAgentClient.createPost({
+            text: task.content || task.title || "",
+            platforms: [platform],
+            projectId,
+          });
+          const postId = result[0]?.postId;
+          if (postId != null && task.sn != null) {
+            try {
+              await analysisClient.updateActionPost(action.id, task.sn, postId);
+            } catch (error) {
+              process.stderr.write(`[warn] Failed to record post_id for sn=${task.sn}: ${error}\n`);
+            }
+          }
+          postResults.push({
+            task: task.title,
+            platform,
+            channel: "(no account — browser extension)",
+            result,
+          });
+        } catch (error) {
+          process.stderr.write(
+            `[skip] ${platform} (no connected account): ${(error as Error).message}\n`
+          );
+        }
         continue;
       }
 
@@ -1684,6 +1817,7 @@ export const actionsPostModule = {
           result = await postAgentClient.createPost({
             text: task.content || task.title || "",
             channels: [channel.id],
+            projectId,
           });
         } catch (error) {
           // A platform needing a value only the user can supply (subreddit,
@@ -1713,7 +1847,8 @@ export const actionsPostModule = {
 
     if (skippedPlatforms.size > 0) {
       process.stderr.write(
-        `[skip] No connected channel for: ${[...skippedPlatforms].join(", ")}. Run 'aisee channels add' to connect.\n`
+        `[skip] No connected channel and no extension publish path for: ${[...skippedPlatforms].join(", ")}. ` +
+        `Run 'aisee channels add' to connect.\n`
       );
     }
 

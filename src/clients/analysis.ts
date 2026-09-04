@@ -26,6 +26,16 @@ export interface SuggestionResult {
   [k: string]: unknown;
 }
 
+/**
+ * Per-run analyzer model override applied to the analysis tree.
+ * Mirrors `AnalyzerModelOverride` in aisee_orchestrator/models/product.py —
+ * an omitted group keeps the subscription template's models.
+ */
+export interface AnalyzerModelOverride {
+  ai_presence_analyzer?: string[];
+  ai_competitor_analyzer?: string[];
+}
+
 export interface TaskTreeNode {
   task: {
     id: string;
@@ -40,12 +50,30 @@ export interface TaskTreeNode {
 }
 
 export const analysisClient = {
-  async scan(url: string, options: { stream?: boolean; use_demo?: boolean } = {}) {
+  /**
+   * Analyzer models available under the caller's subscription template.
+   *
+   * With a product reference the response also carries `latest_task`: the
+   * models that product's most recent analysis actually ran with, which differ
+   * from the template whenever that run used `model_overrides`.
+   */
+  async getAnalyzerModels(productId?: string) {
+    const response = await cx(analysisAxios.get(`/task/analyzer-models`, {
+      params: productId ? { product_id: productId } : undefined,
+    }));
+    return response.data;
+  },
+
+  async scan(
+    url: string,
+    options: { stream?: boolean; use_demo?: boolean; model_overrides?: AnalyzerModelOverride } = {},
+  ) {
     try {
       const response = await cx(analysisAxios.post(`/task/analyze-product`, {
         product_id: url,
         stream: options.stream,
-        use_demo: options.use_demo
+        use_demo: options.use_demo,
+        model_overrides: options.model_overrides,
       }));
       return response.data;
     } catch (err) {
@@ -61,6 +89,7 @@ export const analysisClient = {
       const retryResp = await cx(analysisAxios.post(`/task/analyze-task`, {
         task_id: blockedTaskId,
         stream: options.stream,
+        model_overrides: options.model_overrides,
       }));
       return retryResp.data;
     }
@@ -73,7 +102,7 @@ export const analysisClient = {
 
   async scanAndWait(
     url: string,
-    options: { stream?: boolean; use_demo?: boolean },
+    options: { stream?: boolean; use_demo?: boolean; model_overrides?: AnalyzerModelOverride },
     onTree?: (tree: TaskTreeNode, frame: number) => void
   ): Promise<unknown> {
     const data: any = await analysisClient.scan(url, options);
@@ -98,7 +127,11 @@ export const analysisClient = {
     throw new UserError("Scan timed out after 10 minutes");
   },
 
-  async scanModule(url: string, module_code: string, options: { stream?: boolean; use_demo?: boolean } = {}) {
+  async scanModule(
+    url: string,
+    module_code: string,
+    options: { stream?: boolean; use_demo?: boolean; model_overrides?: AnalyzerModelOverride } = {},
+  ) {
     const productId = getDomain(url);
     const taskResponse = await cx(analysisAxios.get(`/task/product-latest-tasks/${encodeURIComponent(productId)}`));
     if (!taskResponse.data) {
@@ -129,6 +162,7 @@ export const analysisClient = {
     const response = await cx(analysisAxios.post(`/task/analyze-task`, {
       task_id,
       stream: options.stream,
+      model_overrides: options.model_overrides,
     }));
     return response.data;
   },
@@ -136,7 +170,7 @@ export const analysisClient = {
   async scanModuleAndWait(
     url: string,
     module_code: string,
-    options: { stream?: boolean; use_demo?: boolean },
+    options: { stream?: boolean; use_demo?: boolean; model_overrides?: AnalyzerModelOverride },
     onTree?: (tree: TaskTreeNode, frame: number) => void
   ): Promise<unknown> {
     const data: any = await analysisClient.scanModule(url, module_code, options);

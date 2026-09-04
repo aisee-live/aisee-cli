@@ -272,12 +272,14 @@ export interface ScheduleResult {
 }
 
 export interface PublishMethodInfo {
-  platform?: string;
-  identifier?: string;
-  selectable?: string[];
-  default?: string;
-  requiresAccount?: boolean;
-  [k: string]: unknown;
+  platform: string;
+  extensionCapable: boolean;
+  apiCapable: boolean;
+  hasBoundIntegration: boolean;
+  methods: PublishMethod[];
+  defaultMethod: PublishMethod | null;
+  /** Present when no send path is viable — e.g. no bound account. */
+  reason?: string;
 }
 
 let publishMethodsCache: PublishMethodInfo[] | null = null;
@@ -286,7 +288,16 @@ export const postAgentClient = {
   // Posts
   async createPost(data: {
     text: string;
-    channels: string[];
+    /** Bound integration IDs. */
+    channels?: string[];
+    /**
+     * Provider identifiers to post to with NO bound account. `Post.integrationId`
+     * is nullable and such a post is published in-browser by the extension,
+     * which resolves the platform from `providerIdentifier`. Only pass platforms
+     * the backend reports as `extensionCapable` — anything else is flipped
+     * straight to ERROR by `startWorkflow`, which has no account to publish with.
+     */
+    platforms?: string[];
     schedule?: string;
     /** Create as DRAFT so it can later be committed via `commitPosts`. */
     draft?: boolean;
@@ -297,8 +308,19 @@ export const postAgentClient = {
   }): Promise<CreatedPost[]> {
     const group = generateId(10);
     const date = data.schedule ? normalizeScheduleDate(data.schedule) : toLocalISOString(new Date());
-    const posts = await Promise.all(
-      data.channels.map(async (channelId) => {
+    const content = () => ({
+      id: generateId(10),
+      content: textToHtml(data.text),
+      delay: 0,
+      image: data.media ?? [],
+    });
+
+    if (!data.channels?.length && !data.platforms?.length) {
+      throw new UserError("A post needs at least one channel or platform target.");
+    }
+
+    const boundPosts = await Promise.all(
+      (data.channels ?? []).map(async (channelId) => {
         const platform = await lookupChannelPlatform(channelId);
         const settings = buildPlatformSettings(platform, data.text, data.platformOptions ?? {});
         return {
@@ -306,17 +328,21 @@ export const postAgentClient = {
           group,
           settings,
           ...(data.publishMethod ? { publishMethod: data.publishMethod } : {}),
-          value: [
-            {
-              id: generateId(10),
-              content: textToHtml(data.text),
-              delay: 0,
-              image: data.media ?? [],
-            },
-          ],
+          value: [content()],
         };
       })
     );
+
+    const accountlessPosts = (data.platforms ?? []).map((platform) => ({
+      // No `integration`: the platform is carried by providerIdentifier.
+      providerIdentifier: platform,
+      group,
+      settings: buildPlatformSettings(platform, data.text, data.platformOptions ?? {}),
+      publishMethod: "extension" as PublishMethod,
+      value: [content()],
+    }));
+
+    const posts = [...boundPosts, ...accountlessPosts];
 
     const type = data.draft ? "draft" : data.schedule ? "schedule" : "now";
     const payload = {
@@ -413,8 +439,28 @@ export const postAgentClient = {
     return { id: data.id, path: data.path };
   },
 
-  async listPosts(filters: { state?: string; channel?: string[]; page?: number; pageSize?: number } = {}) {
-    const response = await cx(postAgentAxios.get(`/posts/list`, { params: filters }));
+  async listPosts(
+    filters: {
+      state?: string;
+      channel?: string[];
+      integrationId?: string[];
+      source?: string[];
+      projectId?: string;
+      operationPlanId?: string;
+      hasOperationPlan?: boolean;
+      sortBy?: string;
+      sortOrder?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) {
+    const params: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === undefined || value === null) continue;
+      // Both array filters accept the comma form the DTO @Transform splits.
+      params[key] = Array.isArray(value) ? (value.length ? value.join(",") : undefined) : value;
+    }
+    const response = await cx(postAgentAxios.get(`/posts/list`, { params }));
     return response.data;
   },
 
@@ -431,9 +477,11 @@ export const postAgentClient = {
       endDate?: string;
       channel?: string[];
       integrationId?: string[];
+      projectId?: string;
     } = {},
   ) {
     const params: Record<string, unknown> = {};
+    if (options.projectId) params.projectId = options.projectId;
     if (options.startDate) params.startDate = options.startDate;
     if (options.endDate) params.endDate = options.endDate;
     if (options.channel?.length) params.channel = options.channel.join(",");
@@ -451,6 +499,29 @@ export const postAgentClient = {
   // Channels
   async listChannels() {
     const response = await cx(postAgentAxios.get(`/integrations/list`));
+    return response.data;
+  },
+
+  /** Channels bound to one project, with that project's posting times. */
+  async listProjectIntegrations(projectId: string) {
+    const response = await cx(
+      postAgentAxios.get(`/integrations/integration-project/list`, { params: { projectId } }),
+    );
+    return (response.data?.integrations ?? []) as Array<Record<string, unknown>>;
+  },
+
+  async bindIntegrationToProject(integrationId: string, projectId: string) {
+    const response = await cx(
+      postAgentAxios.post(`/integrations/integration-project`, { integrationId, projectId }),
+    );
+    return response.data;
+  },
+
+  /** Keys go in the query string — DELETE bodies are unreliable across proxies. */
+  async unbindIntegrationFromProject(integrationId: string, projectId: string) {
+    const response = await cx(
+      postAgentAxios.delete(`/integrations/integration-project`, { params: { integrationId, projectId } }),
+    );
     return response.data;
   },
 

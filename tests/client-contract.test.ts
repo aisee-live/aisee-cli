@@ -54,6 +54,7 @@ mock.module("../src/clients/http.ts", () => ({
 
 const { analysisClient } = await import("../src/clients/analysis.ts");
 const { postAgentClient } = await import("../src/clients/post-agent.ts");
+const { resolveProjectId, resolveOptionalProjectId, isProjectId } = await import("../src/utils/project.ts");
 
 const INTEGRATIONS = { integrations: [{ id: "ch_x", identifier: "x", name: "Brand X" }] };
 
@@ -292,6 +293,211 @@ describe("postAgentClient.retryPost", () => {
     await postAgentClient.retryPost("p1");
 
     expect(calls[0]).toMatchObject({ method: "post", url: "/posts/p1/retry" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 — project scoping, bindings, analyzer models
+// ---------------------------------------------------------------------------
+
+describe("postAgentClient.listPosts", () => {
+  it("should send array filters in the comma form the DTO transform splits", async () => {
+    handler = () => ({ results: [], total: 0 });
+
+    await postAgentClient.listPosts({ channel: ["x", "reddit"], source: ["calendar", "engage"] });
+
+    const params = calls[0]?.config?.params as Record<string, unknown>;
+    expect(params.channel).toBe("x,reddit");
+    expect(params.source).toBe("calendar,engage");
+  });
+
+  it("should drop empty and undefined filters rather than sending blanks", async () => {
+    handler = () => ({ results: [], total: 0 });
+
+    await postAgentClient.listPosts({ state: "DRAFT", channel: [], projectId: undefined });
+
+    expect(calls[0]?.config?.params).toEqual({ state: "DRAFT", channel: undefined });
+  });
+
+  it("should pass project and plan scoping through", async () => {
+    handler = () => ({ results: [], total: 0 });
+
+    await postAgentClient.listPosts({ projectId: "prod-1", operationPlanId: "plan-1", sortBy: "createdAt" });
+
+    expect(calls[0]?.config?.params).toMatchObject({
+      projectId: "prod-1",
+      operationPlanId: "plan-1",
+      sortBy: "createdAt",
+    });
+  });
+});
+
+describe("postAgentClient.getDashboard project scope", () => {
+  it("should send projectId when given", async () => {
+    handler = () => ({});
+
+    await postAgentClient.getDashboard({ projectId: "prod-1" });
+
+    expect(calls[0]?.config?.params).toEqual({ projectId: "prod-1" });
+  });
+});
+
+describe("postAgentClient.createPost — account-less platform targets", () => {
+  it("should carry the platform in providerIdentifier with no integration", async () => {
+    // Post.integrationId is nullable; such a post is published in-browser by
+    // the extension, which resolves the platform from providerIdentifier.
+    handler = (call) => (call.url === "/integrations/list" ? INTEGRATIONS : [{ postId: "p1", integration: null }]);
+
+    await postAgentClient.createPost({ text: "Hello", platforms: ["hackernews"] });
+
+    const post = (calls.find((c) => c.url === "/posts")?.body as any).posts[0];
+    expect(post.providerIdentifier).toBe("hackernews");
+    expect(post.integration).toBeUndefined();
+    expect(post.publishMethod).toBe("extension");
+    expect(post.settings).toEqual({ title: "Hello" });
+  });
+
+  it("should not look up integrations when there are no bound channels", async () => {
+    handler = () => [{ postId: "p1", integration: null }];
+
+    await postAgentClient.createPost({ text: "Hello", platforms: ["quora"] });
+
+    expect(calls.find((c) => c.url === "/integrations/list")).toBeUndefined();
+  });
+
+  it("should refuse a post with no target at all", async () => {
+    await expect(postAgentClient.createPost({ text: "Hello" })).rejects.toThrow(/at least one channel or platform/);
+  });
+
+  it("should send projectId when the caller resolved one", async () => {
+    handler = (call) => (call.url === "/integrations/list" ? INTEGRATIONS : [{ postId: "p1" }]);
+
+    await postAgentClient.createPost({ text: "Hello", channels: ["ch_x"], projectId: "prod-1" });
+
+    expect((calls.find((c) => c.url === "/posts")?.body as any).projectId).toBe("prod-1");
+    expect((calls.find((c) => c.url === "/posts")?.body as any).source).toBe("calendar");
+  });
+});
+
+describe("postAgentClient project bindings", () => {
+  it("should list a project's bindings", async () => {
+    handler = () => ({ integrations: [{ id: "ch_x" }] });
+
+    const rows = await postAgentClient.listProjectIntegrations("prod-1");
+
+    expect(calls[0]?.url).toBe("/integrations/integration-project/list");
+    expect(calls[0]?.config?.params).toEqual({ projectId: "prod-1" });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("should bind with a JSON body", async () => {
+    handler = () => ({});
+
+    await postAgentClient.bindIntegrationToProject("ch_x", "prod-1");
+
+    expect(calls[0]).toMatchObject({ method: "post", url: "/integrations/integration-project" });
+    expect(calls[0]?.body).toEqual({ integrationId: "ch_x", projectId: "prod-1" });
+  });
+
+  it("should unbind with query params, not a body", async () => {
+    // DELETE bodies are unreliable across proxies, so the route takes keys in
+    // the query string.
+    handler = () => ({ success: true });
+
+    await postAgentClient.unbindIntegrationFromProject("ch_x", "prod-1");
+
+    expect(calls[0]).toMatchObject({ method: "delete", url: "/integrations/integration-project" });
+    expect(calls[0]?.config?.params).toEqual({ integrationId: "ch_x", projectId: "prod-1" });
+    expect(calls[0]?.body).toBeUndefined();
+  });
+});
+
+describe("analysisClient.getAnalyzerModels", () => {
+  it("should omit product_id when no product is given", async () => {
+    handler = () => ({ ai_presence_analyzer: [] });
+
+    await analysisClient.getAnalyzerModels();
+
+    expect(calls[0]?.url).toBe("/task/analyzer-models");
+    expect(calls[0]?.config?.params).toBeUndefined();
+  });
+
+  it("should send product_id to also get the last run's models", async () => {
+    handler = () => ({ ai_presence_analyzer: [], latest_task: null });
+
+    await analysisClient.getAnalyzerModels("example.com");
+
+    expect(calls[0]?.config?.params).toEqual({ product_id: "example.com" });
+  });
+});
+
+describe("analysisClient.scan model overrides", () => {
+  it("should forward model_overrides to analyze-product", async () => {
+    handler = () => ({ task_id: "t1", status: "processing" });
+
+    await analysisClient.scan("https://example.com", {
+      model_overrides: { ai_presence_analyzer: ["openai/gpt-5.2"] },
+    });
+
+    expect((calls[0]?.body as any).model_overrides).toEqual({ ai_presence_analyzer: ["openai/gpt-5.2"] });
+  });
+});
+
+// Kept last: getPublishMethods memoizes for the process, so a later test
+// asking for it again would not see a request.
+describe("postAgentClient.getPublishMethods", () => {
+  it("should fetch once and reuse the org-level answer", async () => {
+    handler = () => [{ platform: "x", extensionCapable: true, apiCapable: true, defaultMethod: "extension" }];
+
+    const first = await postAgentClient.getPublishMethods();
+    const second = await postAgentClient.getPublishMethods();
+
+    expect(first).toBe(second);
+    expect(calls.filter((c) => c.url === "/posts/publish-methods")).toHaveLength(1);
+  });
+});
+
+describe("resolveProjectId", () => {
+  it("should return a UUID untouched, without a lookup", async () => {
+    const uuid = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
+
+    expect(await resolveProjectId(uuid)).toBe(uuid);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("should recognise a UUID regardless of case", () => {
+    expect(isProjectId("3F2504E0-4F89-11D3-9A0C-0305E82C3301")).toBe(true);
+    expect(isProjectId("example.com")).toBe(false);
+  });
+
+  it("should look a domain up through the product endpoint, which accepts either form", async () => {
+    handler = () => ({ id: "prod-uuid-1", url: "https://alpha.test" });
+
+    const id = await resolveProjectId("https://alpha.test");
+
+    expect(id).toBe("prod-uuid-1");
+    expect(calls[0]?.url).toBe("/product/alpha.test");
+  });
+
+  it("should memoize a resolved product for the process", async () => {
+    handler = () => ({ id: "prod-uuid-2" });
+
+    await resolveProjectId("https://beta.test");
+    const before = calls.length;
+    await resolveProjectId("beta.test");
+
+    expect(calls).toHaveLength(before);
+  });
+
+  it("should point at scan when the product does not exist yet", async () => {
+    handler = () => null;
+
+    await expect(resolveProjectId("https://missing.test")).rejects.toThrow(/aisee scan/);
+  });
+
+  it("should send nothing when --project was not passed", async () => {
+    expect(await resolveOptionalProjectId(undefined)).toBeUndefined();
+    expect(calls).toHaveLength(0);
   });
 });
 

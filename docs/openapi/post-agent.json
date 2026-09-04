@@ -95,6 +95,20 @@
         ]
       }
     },
+    "/auth/token-refresh": {
+      "post": {
+        "operationId": "AuthController_tokenRefresh",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/forgot": {
       "post": {
         "operationId": "AuthController_forgot",
@@ -238,6 +252,38 @@
         },
         "tags": [
           "Auth"
+        ]
+      }
+    },
+    "/public/plans": {
+      "get": {
+        "operationId": "PublicController_getPlans",
+        "summary": "",
+        "description": "Public plan catalog for pricing/marketing pages, one entry per tier:\n- engage: keywords / tracked accounts / monitored channels caps (org-wide\n  and per-project), scan interval, monthly reply cap, metrics window.\n  `null` = unlimited.\n- posts: free posts per billing period + channel cap from the\n  `post_plan_limits` Settings map (the source of truth for resolved\n  plans). `null` = no limit.\nPlus reply credit pricing, the per-post overage cost, and the platforms\nengage scanning currently covers. No org, usage, or billing state — safe\nwithout authentication.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/public/extension/latest": {
+      "get": {
+        "operationId": "PublicController_getExtensionLatest",
+        "summary": "",
+        "description": "The published builds, plus the floor the API enforces.\n\n`minVersion` is the SAME value `ExtensionVersionGuard` compares against —\nread through the shared `readMinExtensionVersion` so the two can never\ndisagree, which would have this endpoint telling a client it is fine while\nevery other call refuses it. `''` means the gate is off (or its settings\nread failed) and is returned as null: \"no floor stated\", not \"floor zero\".\n\nWhy the body and not only the response header: the header is set by the\nguard, and only for requests that ANNOUNCE a version. This route is\nunauthenticated, so it is the one call a fresh or logged-out install can\nmake — and `chrome.version` next to `minVersion` is what lets the extension\ndistinguish \"a newer build exists\" from \"this build is about to be\nrefused\". The web app's download button reads the same payload.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Public"
         ]
       }
     },
@@ -1144,6 +1190,72 @@
         ]
       }
     },
+    "/integrations/integration-project": {
+      "post": {
+        "operationId": "IntegrationsController_upsertIntegrationProject",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "delete": {
+        "operationId": "IntegrationsController_removeIntegrationProject",
+        "parameters": [
+          {
+            "name": "integrationId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/integration-project/list": {
+      "get": {
+        "operationId": "IntegrationsController_listProjectIntegrations",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
     "/integrations/mentions": {
       "post": {
         "operationId": "IntegrationsController_mentions",
@@ -1154,6 +1266,37 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/IntegrationFunctionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/integrations/user-by-username": {
+      "post": {
+        "operationId": "IntegrationsController_fetchUserByUsername",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserByUsernameDto"
               }
             }
           }
@@ -1497,6 +1640,120 @@
         ]
       }
     },
+    "/settings/metrics-window": {
+      "get": {
+        "operationId": "SettingsController_getMetricsWindow",
+        "summary": "",
+        "description": "Metrics-monitoring window for this org: how many days a published post\nstays under analytics monitoring (own posts + engage). Returns the resolved\neffective window, the plan ceiling, and the raw user override (if set).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      },
+      "post": {
+        "operationId": "SettingsController_updateMetricsWindow",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricsWindowDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/posts/metrics/due": {
+      "post": {
+        "operationId": "PostsController_getDueMetrics",
+        "summary": "",
+        "description": "Demand-driven metrics fetch gate for the browser extension. The extension\nsends the post ids it is currently viewing (one page); the server resolves\nthe org's effective monitoring window + fetch interval and returns ONLY the\nsubset due for a refresh — the \"visible ∩ due\" intersection. Covers own\nposts and engage replies alike (both are Post rows).\n\nSession-risky platforms (LinkedIn/Medium/Quora — fetched by driving the\nuser's own logged-in session) are additionally gated by the scan platform\nallowlist, the same single switch that gates their scan tasks. The\nextension has no build-time flag for them anymore, so filtering here is\nwhat keeps a disallowed platform's session untouched. Public-API platforms\n(Reddit/Dev.to/HN) and X (extension-side ENGAGE_X_ENABLED build gate) are\nnot filtered.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricsDueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/metrics/ingest": {
+      "post": {
+        "operationId": "PostsController_ingestMetrics",
+        "summary": "",
+        "description": "Ingest for the demand-driven fetch: the extension submits the metrics it\nread from the platform (on the user's own session) for the viewed posts.\nPure data submission — the server makes NO provider API call; it resolves\neach post's platform from ownership, runs the same extract/traffic pipeline\nas the OAuth analytics sync, persists impressions/traffic/snapshot, and\nstamps `lastMetricsFetchAt` so the interval gate holds. Named `ingest` to\nmatch `/engage/scan-tasks/ingest` (same concept: extension submits fetched\ndata, server only persists).",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricsIngestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/metrics/backfill": {
+      "post": {
+        "operationId": "PostsController_ingestMetricsLegacy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricsIngestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
     "/posts/{id}/statistics": {
       "get": {
         "operationId": "PostsController_getStatistics",
@@ -1668,6 +1925,31 @@
             }
           },
           {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationPlanId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasOperationPlan",
+            "required": false,
+            "in": "query",
+            "description": "true = only posts that belong to an OperationPlan; false = only posts without one. Ignored when operationPlanId is set.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "state",
             "required": false,
             "in": "query",
@@ -1679,6 +1961,22 @@
                 "DRAFT"
               ],
               "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "calendar",
+                  "chat",
+                  "engage"
+                ]
+              }
             }
           },
           {
@@ -1729,7 +2027,9 @@
                   "gmb",
                   "wrapcast",
                   "nostr",
-                  "vk"
+                  "vk",
+                  "quora",
+                  "hackernews"
                 ]
               }
             }
@@ -1786,7 +2086,8 @@
                         "type": "string"
                       },
                       "integration": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true
                       },
                       "state": {
                         "type": "string"
@@ -1823,7 +2124,16 @@
     "/posts/find-slot": {
       "get": {
         "operationId": "PostsController_findSlot",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -1842,6 +2152,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -1989,7 +2307,9 @@
                   "gmb",
                   "wrapcast",
                   "nostr",
-                  "vk"
+                  "vk",
+                  "quora",
+                  "hackernews"
                 ]
               }
             }
@@ -2000,6 +2320,47 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationPlanId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasOperationPlan",
+            "required": false,
+            "in": "query",
+            "description": "true = only posts that belong to an OperationPlan; false = only posts without one. Ignored when operationPlanId is set.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "calendar",
+                  "chat",
+                  "engage"
+                ]
+              }
             }
           },
           {
@@ -2159,7 +2520,9 @@
                   "gmb",
                   "wrapcast",
                   "nostr",
-                  "vk"
+                  "vk",
+                  "quora",
+                  "hackernews"
                 ]
               }
             }
@@ -2170,6 +2533,47 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationPlanId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasOperationPlan",
+            "required": false,
+            "in": "query",
+            "description": "true = only posts that belong to an OperationPlan; false = only posts without one. Ignored when operationPlanId is set.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "calendar",
+                  "chat",
+                  "engage"
+                ]
+              }
             }
           },
           {
@@ -2299,6 +2703,38 @@
         ]
       }
     },
+    "/posts/publish-due/count": {
+      "get": {
+        "operationId": "PostsController_countDuePublish",
+        "summary": "",
+        "description": "Read-only backlog counts for the extension publish queue.\n\nSeparate route rather than a flag on POST /publish-due, because that one\nLEASES what it returns: a client polling it to render a number would hold\na batch away from the browser meant to publish it for the whole lease\nwindow. Nothing here claims, stamps or state-changes anything.\n\nMUST stay declared BEFORE `@Get('/:id')` — a later static route would be\nshadowed by the param route and resolve 'publish-due' as an id.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/publish-methods": {
+      "get": {
+        "operationId": "PostsController_getPublishMethods",
+        "summary": "",
+        "description": "Publish-method capability for the scheduling/editor UI: for EVERY registered\nplatform, which send paths (extension / api) are selectable, the default the\nbackend would auto-pick, and whether an account must be connected first.\n\nA pure, side-effect-free read of ORG-level state (the platform registry ∩ the\norg's bound accounts), so it is a GET with no parameters and the client is\nexpected to fetch it ONCE and cache it — same shape as GET /engage/config —\nrather than per post or per editor keystroke.\n\nOrg-scoped, so any signed-in user can call it: GET /admin/social-providers is\nsuperadmin-only and static, and cannot answer \"does THIS org have a bound\naccount\". The UI renders the choice from this before committing via\nPOST /posts/schedule or setting posts[].publishMethod on POST /posts.\n\nMUST stay declared BEFORE `@Get('/:id')` — a later static route would be\nshadowed by the `:id` wildcard and never reached.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
     "/posts/{id}": {
       "get": {
         "operationId": "PostsController_getPost",
@@ -2307,6 +2743,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -2393,6 +2837,29 @@
         ]
       }
     },
+    "/posts/id/{id}": {
+      "delete": {
+        "operationId": "PostsController_deletePostById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
     "/posts/{id}/retry": {
       "post": {
         "operationId": "PostsController_retryPost",
@@ -2439,9 +2906,170 @@
         ]
       }
     },
+    "/posts/schedule": {
+      "post": {
+        "operationId": "PostsController_schedulePosts",
+        "summary": "",
+        "description": "Commit a batch of hand-picked DRAFT posts to the send queue (DRAFT ->\nQUEUE): the DB QUEUE state becomes the single source of truth and the send\npath (extension vs API) is decided here per post. API posts start their\nTemporal workflow; extension posts stay QUEUE for the extension publish-due\nloop. Returns per-post scheduled/failed so one unbindable platform never\nblocks the rest.\n\nExplicit ids only. Committing a whole operation plan lives at\nPOST /projects/:projectId/automation/publishing — see SchedulePostsDto for\nwhy that moved off this route.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchedulePostsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
     "/posts/separate-posts": {
       "post": {
         "operationId": "PostsController_separatePosts",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{id}/extension-published": {
+      "patch": {
+        "operationId": "PostsController_markExtensionPublished",
+        "summary": "",
+        "description": "Extension publish-on-success callback: the browser extension published this\nPost in-browser (X / Reddit) with the user's own platform session and\nreports back the permalink (+ platform post id). Flip the saved Post to\nPUBLISHED and backfill releaseURL/releaseId — the Post-side mirror of\nPATCH /engage/sent/:id/publish-reply. Org-scoped and idempotent.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkExtensionPublishedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{id}/extension-removed": {
+      "patch": {
+        "operationId": "PostsController_markExtensionPostRemoved",
+        "summary": "",
+        "description": "Extension removal callback: the post published successfully and the\nplatform removed it seconds later, verified by the extension from a\nlogged-out view (currently Reddit only). Records the removal and keeps the\nPost PUBLISHED — charging/claiming has no equivalent here (a Post has no\nopportunity), so unlike engage's identical-shaped callback this one has\nnothing to withhold. Org-scoped.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkExtensionPostRemovedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/{id}/extension-publish-failed": {
+      "patch": {
+        "operationId": "PostsController_markExtensionPublishFailed",
+        "summary": "",
+        "description": "Extension publish-failed callback: the in-browser send settled as an error,\nso flip the row QUEUE → ERROR with the reason instead of leaving it in\nQUEUE to be re-offered forever. Org-scoped; a row already PUBLISHED is\nnever touched.\n\n`segments` makes a PARTIAL thread failure recordable: the segments that did\npublish are marked PUBLISHED with their own permalinks and only the rest\nbecomes ERROR. Optional, so an older extension keeps the all-or-nothing\nbehaviour.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkExtensionPublishFailedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/publish-due": {
+      "post": {
+        "operationId": "PostsController_getDuePublish",
+        "summary": "",
+        "description": "Extension publish-due: the browser extension polls this for QUEUE posts on\nextension-routed integrations (hackernews/quora, or any platform routed via\nEXTENSION_PUBLISH_PLATFORMS) that are due to publish. It publishes each\nin-browser with the user's own session and reports back via\nPATCH /:id/extension-published. Org-scoped; the backend makes no provider\nAPI call (backend = scheduler, extension = executor — same as metrics/due).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Posts"
+        ]
+      }
+    },
+    "/posts/sync-metrics": {
+      "post": {
+        "operationId": "PostsController_syncPostMetrics",
         "parameters": [],
         "responses": {
           "201": {
@@ -3720,6 +4348,14 @@
         "operationId": "DashboardController_getSummary",
         "parameters": [
           {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "startDate",
             "required": false,
             "in": "query",
@@ -3783,7 +4419,9 @@
                   "gmb",
                   "wrapcast",
                   "nostr",
-                  "vk"
+                  "vk",
+                  "quora",
+                  "hackernews"
                 ]
               }
             }
@@ -3810,6 +4448,14 @@
       "get": {
         "operationId": "DashboardController_getPostsTrend",
         "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "period",
             "required": false,
@@ -3847,6 +4493,14 @@
         "operationId": "DashboardController_getTraffics",
         "parameters": [
           {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "startDate",
             "required": false,
             "in": "query",
@@ -3910,7 +4564,9 @@
                   "gmb",
                   "wrapcast",
                   "nostr",
-                  "vk"
+                  "vk",
+                  "quora",
+                  "hackernews"
                 ]
               }
             }
@@ -3937,6 +4593,14 @@
       "get": {
         "operationId": "DashboardController_getImpressions",
         "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "period",
             "required": false,
@@ -4015,7 +4679,9 @@
                   "gmb",
                   "wrapcast",
                   "nostr",
-                  "vk"
+                  "vk",
+                  "quora",
+                  "hackernews"
                 ]
               }
             }
@@ -4043,6 +4709,14 @@
         "operationId": "DashboardController_getPostEngagement",
         "parameters": [
           {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "days",
             "required": false,
             "in": "query",
@@ -4068,6 +4742,3381 @@
         },
         "tags": [
           "Dashboard"
+        ]
+      }
+    },
+    "/engage/scan-tasks/ingest": {
+      "post": {
+        "operationId": "EngageController_scanTasksIngest",
+        "summary": "Extension scan loop: ingest a completed unit (optional) and claim the next batch of due units",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngageScanSyncDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/scan-tasks/hint": {
+      "get": {
+        "operationId": "EngageController_scanTasksHint",
+        "summary": "Cheap probe (one Redis GET) telling the extension whether it is worth calling /scan-tasks/ingest right now. Fast lane only — the extension still polls ingest unconditionally on its slower backstop alarm.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/scan-tasks/release": {
+      "post": {
+        "operationId": "EngageController_scanTasksRelease",
+        "summary": "Release a held scan-task lease so the unit can be re-claimed. Resets status → IDLE without advancing the cursor; select and claim the unit afterwards to bypass cadence.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/scan-posts/ingest": {
+      "post": {
+        "operationId": "EngageController_ingestScanPosts",
+        "summary": "Ingest posts collected by the extension outside a claimed scan task.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngageScanPostsIngestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/config": {
+      "get": {
+        "operationId": "EngageController_getConfig",
+        "summary": "Get Engage config and keywords/channels/accounts for this org",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      },
+      "post": {
+        "operationId": "EngageController_saveConfig",
+        "summary": "Update Engage config: enable/disable, and the project's unattended reply mode (off | review | auto)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveEngageConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "400": {
+            "description": "autoReplyEnabled was sent without a projectId — unattended replying is driven by a project's operation plan, so it cannot be set on the legacy null-project config"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/config/reset": {
+      "post": {
+        "operationId": "EngageController_resetConfig",
+        "summary": "Reset Engage config to disabled state",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/setup": {
+      "post": {
+        "operationId": "EngageController_setupEngage",
+        "summary": "Atomic bulk setup: create config + keywords + channels + tracked accounts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupEngageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/keywords": {
+      "post": {
+        "operationId": "EngageController_addKeyword",
+        "summary": "Add a keyword to monitor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddKeywordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/keywords/bulk": {
+      "post": {
+        "operationId": "EngageController_addKeywordsBulk",
+        "summary": "Bulk-add keywords (idempotent; duplicates skipped)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddKeywordsBulkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/keywords/{id}": {
+      "patch": {
+        "operationId": "EngageController_updateKeyword",
+        "summary": "Update keyword enabled state or type",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateKeywordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Keyword not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      },
+      "delete": {
+        "operationId": "EngageController_deleteKeyword",
+        "summary": "Delete a keyword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Keyword not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/keywords/{id}/posts": {
+      "get": {
+        "operationId": "EngageController_getKeywordPosts",
+        "summary": "Preview recent posts matching a keyword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Keyword not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/monitored-channels": {
+      "get": {
+        "operationId": "EngageController_listMonitoredChannels",
+        "summary": "List monitored channels for this org",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      },
+      "post": {
+        "operationId": "EngageController_addMonitoredChannel",
+        "summary": "Add a subreddit to monitor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMonitoredChannelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Platform has no channel scope (only reddit does), or the community name is not a valid subreddit"
+          },
+          "409": {
+            "description": "Channel already monitored by this config"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/monitored-channels/{id}": {
+      "patch": {
+        "operationId": "EngageController_updateMonitoredChannel",
+        "summary": "Update a monitored channel (enable/disable, metadata)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMonitoredChannelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      },
+      "delete": {
+        "operationId": "EngageController_removeMonitoredChannel",
+        "summary": "Remove a monitored channel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/monitored-channels/reddit/capability": {
+      "post": {
+        "operationId": "EngageController_reportRedditChannelCapability",
+        "summary": "Report a subreddit's observed posting rules (flair options, flair/tag required)",
+        "description": "Reddit's flair endpoints answer USER_REQUIRED to unauthenticated callers and this deployment has no Reddit API credentials, so a flair list can only be read where Reddit renders it: the extension's submit tab. This is that observation coming back. Returns updated:0 when the org does not monitor the subreddit — no row is created for a cache.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRedditChannelCapabilityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/monitored-channels/search": {
+      "post": {
+        "operationId": "EngageController_searchChannels",
+        "summary": "Search for channels to add (e.g. Reddit subreddit search)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchChannelsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/tracked-accounts": {
+      "get": {
+        "operationId": "EngageController_listTrackedAccounts",
+        "summary": "List external X accounts tracked by this org",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      },
+      "post": {
+        "operationId": "EngageController_addTrackedAccount",
+        "summary": "Add an external X account to track",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTrackedAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/tracked-accounts/{id}": {
+      "patch": {
+        "operationId": "EngageController_updateTrackedAccount",
+        "summary": "Update a tracked account (enable/disable, label)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTrackedAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Tracked account not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      },
+      "delete": {
+        "operationId": "EngageController_removeTrackedAccount",
+        "summary": "Remove a tracked account",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Tracked account not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/reply-accounts": {
+      "get": {
+        "operationId": "EngageController_listReplyAccounts",
+        "summary": "List this org's X integrations with Engage reply settings",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/reply-accounts/{integrationId}": {
+      "post": {
+        "operationId": "EngageController_upsertReplyAccountSettings",
+        "summary": "Create or update reply account settings for a project",
+        "parameters": [
+          {
+            "name": "integrationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReplyAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "400": {
+            "description": "projectId is required"
+          },
+          "404": {
+            "description": "Integration not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/reply-due": {
+      "post": {
+        "operationId": "EngageController_getDueReplies",
+        "summary": "Drafts due for unattended reply (extension pull; org-scoped, paced)",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/reply-queue-status": {
+      "get": {
+        "operationId": "EngageController_getReplyQueueStatus",
+        "summary": "Read-only queue/eligibility status for unattended reply (no side effects)",
+        "description": "Read-only status of the unattended reply driver, per (project, platform):\nhow many replies are already queued, how many opportunities are still\neligible to be drafted, and whether pacing (active hours / local window /\nminimum gap) currently allows a poll to hand any of it out.\n\nA GET, unlike `/reply-due`: it claims nothing, drafts nothing, and is safe\nto poll as often as a debug panel wants — `/reply-due` cannot answer \"is\nthere something queued that pacing is holding back\" without side effects,\nsince claiming a queued row IS one.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/scan": {
+      "post": {
+        "operationId": "EngageController_triggerScan",
+        "summary": "Trigger a due-only keyword/channel scan (new units scan immediately, cooldown-respecting)",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "429": {
+            "description": "Rate limit exceeded (5/hour)"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/refresh-on-visit": {
+      "post": {
+        "operationId": "EngageController_refreshOnVisit",
+        "summary": "Page-visit trigger: fire-and-forget kick of this org's DUE scan (keywords/tracked/channels). Returns { status, coldStart, nextRefreshAt }; the client caches nextRefreshAt and skips calling again until then. Metrics are NOT handled here — refresh them via POST /sent/metrics/refresh with the post ids on screen.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/metrics/refresh": {
+      "post": {
+        "operationId": "EngageController_refreshSentMetrics",
+        "summary": "Event-driven metrics refresh: the client posts the exact post ids it is showing on /engage/sent (any sort/filter/page). The server refreshes only those PUBLISHED, in-window, and past their per-plan metrics interval — then fire-and-forgets the X/Reddit fetch. Returns { accepted, throttled, nextRefreshAt }. When `accepted` is non-empty a fetch was kicked; re-read GET /sent to surface the new impressions/trafficScore once it lands (NOT GET /sent/:id/status — that returns state/replyUrl only, no metrics).",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshMetricsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/score-stats": {
+      "get": {
+        "operationId": "EngageController_getScoreStats",
+        "summary": "Score distribution and top-opportunity stats for this org",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "today",
+                "week",
+                "month"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/counts": {
+      "get": {
+        "operationId": "EngageController_getOpportunityCountsSummary",
+        "summary": "Rollup for tab/platform badges: total + byStatus + byPlatform in one call, all computed under the SAME conditions — the /opportunities filter contract minus status/platform (those are the breakdown axes here, not filters). Replaces doing N separate limit=1 list calls just to read totals.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keywords",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "today",
+                "week"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minScore",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreKeyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreHeat",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreAuthority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "channels",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "authors",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "bookmarked",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/counts/summary": {
+      "get": {
+        "operationId": "EngageController_getOpportunityCountsSummary",
+        "summary": "Rollup for tab/platform badges: total + byStatus + byPlatform in one call, all computed under the SAME conditions — the /opportunities filter contract minus status/platform (those are the breakdown axes here, not filters). Replaces doing N separate limit=1 list calls just to read totals.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keywords",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "today",
+                "week"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minScore",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreKeyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreHeat",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreAuthority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "channels",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "authors",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "bookmarked",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/count": {
+      "get": {
+        "operationId": "EngageController_countOpportunities",
+        "summary": "Filtered counts under EXACTLY the same filters as GET /opportunities: `total` honors every filter (status/platform included, same number the list returns); `byStatus` honors every filter except `status` itself (the breakdown axis), so per-status badges stay complete while platform/keywords/date narrow them. Sort/pagination params are accepted and ignored, so clients can reuse the list query string verbatim.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "intent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keywords",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "today",
+                "week"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minScore",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreKeyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreHeat",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreAuthority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "channels",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "authors",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "bookmarked",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/locate": {
+      "get": {
+        "operationId": "EngageController_locateOpportunity",
+        "summary": "Locate the page of a given opportunityStateId within /opportunities using the same filters and sort. Returns null page when the opportunity does not match the filters.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "intent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keywords",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "today",
+                "week"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minScore",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreKeyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreHeat",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreAuthority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "channels",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "authors",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "bookmarked",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities": {
+      "get": {
+        "operationId": "EngageController_listOpportunities",
+        "summary": "Paginated list of signal-feed opportunities for this org",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "intent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keywords",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "today",
+                "week"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "minScore",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreKeyword",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreHeat",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minScoreAuthority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "channels",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "authors",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "bookmarked",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}": {
+      "get": {
+        "operationId": "EngageController_getOpportunityById",
+        "summary": "Get a single signal-feed opportunity by id; response shape matches one item from /opportunities",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Opportunity not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/dismiss": {
+      "patch": {
+        "operationId": "EngageController_dismissOpportunity",
+        "summary": "Dismiss an opportunity (moves it to DISMISSED status)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Opportunity not found or no longer actionable"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/target-gone": {
+      "post": {
+        "operationId": "EngageController_reportTargetGone",
+        "summary": "Report that an opportunity’s post no longer exists. `confirmed: true` (platform answered 404/410) retires the shared opportunity and closes the caller’s queued replies; anything else closes only the caller’s replies.",
+        "description": "The extension reporting that a reply target is GONE from the platform.\n\nCalled by the unattended reply runner when a poster proves the post no\nlonger exists — not when it merely failed. Every other failure (a signed-out\nsession, a rate limit, markup that moved) is retryable and must stay in the\nqueue; this one never succeeds, and before this endpoint existed the same\ndead post was re-offered on every poll for as long as its row lived.\n\nRetires the opportunity (`deletedAt`) and closes the caller's replies parked\nagainst it. 404 when the caller has no queued reply waiting on it — which is\nalso the authorisation check, since EngageOpportunity is shared across orgs.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportTargetGoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "404": {
+            "description": "No queued reply of this org is waiting on that opportunity"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/bookmark": {
+      "patch": {
+        "operationId": "EngageController_toggleBookmark",
+        "summary": "Toggle bookmark on an opportunity",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Opportunity not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/draft": {
+      "post": {
+        "operationId": "EngageController_generateDraft",
+        "summary": "Stream an AI-generated reply draft via SSE (text/event-stream)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream of text chunks; ends with [DONE]. Non-actionable statuses (expired/replied/scheduled/dismissed) end the stream with a typed error frame carrying a human-readable reason."
+          },
+          "201": {
+            "description": ""
+          },
+          "404": {
+            "description": "Opportunity not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded (20/hour)"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/save-draft": {
+      "post": {
+        "operationId": "EngageController_saveDraft",
+        "summary": "Save (upsert) an unpublished working draft reply for an opportunity — one DRAFT per opportunity. Content may be AI-generated, edited, or hand-typed. Surfaces in GET /sent?status=awaiting (Post.state=DRAFT). Does NOT claim the opportunity, charge credits, or sync metrics.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Opportunity is no longer actionable (expired / replied / scheduled / dismissed)"
+          },
+          "404": {
+            "description": "Opportunity not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/generate-post": {
+      "post": {
+        "operationId": "EngageController_generateReferencePost",
+        "summary": "Generate AND save an AI-written ORIGINAL post inspired by an opportunity, via SSE (text/event-stream) — not a reply. Always persists as an account-less DRAFT Post; `sourceAdaptation` (PRESERVE_STRUCTURE | REFRAME | FRESH_ANGLE, default REFRAME) sets how closely it may follow the reference, and `thread: true` produces a native thread (anchor + parentPostId-chained follow-ups) where the platform supports one.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateReferencePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream ending with a data frame carrying {text, postId, parts, thread, threadSkippedReason?} then [DONE]. `parts` is one entry per post in the chain (a single-element array unless a thread was produced) and `thread` reports whether one actually was — a thread requested on a platform that cannot chain one (medium/quora/devto) degrades to a single post with threadSkippedReason=platform_unsupported. A thread whose tail overruns the platform character ceiling is delivered truncated to its valid prefix, with `droppedParts` counting what was discarded, rather than failing the whole generation. Failures (opportunity not found, generation failed, too similar to the reference, engage_insufficient_credits) end the stream with a typed error frame instead; the untyped `generation_failed` frame also carries a diagnostic `reason` string."
+          },
+          "201": {
+            "description": ""
+          },
+          "404": {
+            "description": "Opportunity not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded (20/hour)"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/send-now": {
+      "post": {
+        "operationId": "EngageController_cancelAndSendNow",
+        "summary": "Cancel a scheduled reply and immediately send it",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "400": {
+            "description": "No scheduled reply found, or post already published"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/schedule": {
+      "post": {
+        "operationId": "EngageController_scheduleReply",
+        "summary": "Schedule a reply to an opportunity for future publishing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "403": {
+            "description": "Opportunity is no longer actionable (replied / scheduled / dismissed / expired) — carries a typed { code, message } reason"
+          },
+          "404": {
+            "description": "Opportunity not found"
+          },
+          "409": {
+            "description": "Opportunity was just claimed by another concurrent request"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/batch-schedule": {
+      "post": {
+        "operationId": "EngageController_batchScheduleReply",
+        "summary": "Schedule replies from multiple integrations at different times in one request",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchScheduleReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "400": {
+            "description": "Any scheduledAt is not in the future, or items array is invalid"
+          },
+          "403": {
+            "description": "Opportunity is no longer actionable (replied / scheduled / dismissed / expired) — carries a typed { code, message } reason"
+          },
+          "404": {
+            "description": "Opportunity not found"
+          },
+          "409": {
+            "description": "Opportunity was just claimed by another concurrent request"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/batch-send": {
+      "post": {
+        "operationId": "EngageController_batchSendReply",
+        "summary": "Send replies from multiple integrations immediately in one request",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchSendReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "403": {
+            "description": "Opportunity is no longer actionable (replied / scheduled / dismissed / expired) — carries a typed { code, message } reason"
+          },
+          "404": {
+            "description": "Opportunity not found"
+          },
+          "409": {
+            "description": "Opportunity was just claimed by another concurrent request"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/opportunities/{id}/manual-reply": {
+      "post": {
+        "operationId": "EngageController_confirmManualReply",
+        "summary": "Confirm a manual reply (Reddit or X) and record it in the system. X requires replyUrl + integrationId.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmManualReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "403": {
+            "description": "Opportunity is no longer actionable (replied / scheduled / dismissed / expired) — carries a typed { code, message } reason"
+          },
+          "404": {
+            "description": "Opportunity not found"
+          },
+          "409": {
+            "description": "Opportunity was just claimed by another concurrent request"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/locate": {
+      "get": {
+        "operationId": "EngageController_locateSentReply",
+        "summary": "Locate the page of a given sentReplyId within /sent using the same filters. Returns null page when the reply does not match the filters.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sentReplyId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "published",
+                "scheduled",
+                "manual",
+                "error",
+                "draft",
+                "settled",
+                "awaiting",
+                "awaiting-draft",
+                "awaiting-expired",
+                "awaiting-link"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent": {
+      "get": {
+        "operationId": "EngageController_listSentReplies",
+        "summary": "Paginated list of Engage replies. Optional status filter: published | scheduled | manual | error | draft, plus rollups — settled (published + scheduled) and awaiting (draft + manual link-pending + failed publishes) — and awaiting's own sub-filters for the Awaiting-review tabs: awaiting-draft (still-actionable draft), awaiting-expired (draft whose opportunity aged out), awaiting-link (link-pending or failed publish)",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "published",
+                "scheduled",
+                "manual",
+                "error",
+                "draft",
+                "settled",
+                "awaiting",
+                "awaiting-draft",
+                "awaiting-expired",
+                "awaiting-link"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/stats": {
+      "get": {
+        "operationId": "EngageController_getSentStats",
+        "summary": "Aggregate stats for sent replies, scoped by the same date/platform/status filters as /sent (no date = all-time)",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "published",
+                "scheduled",
+                "manual",
+                "error",
+                "draft",
+                "settled",
+                "awaiting",
+                "awaiting-draft",
+                "awaiting-expired",
+                "awaiting-link"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/counts/summary": {
+      "get": {
+        "operationId": "EngageController_getSentCountsSummary",
+        "summary": "Rollup for the sent tabs' badges: total + byPlatform + rollups (settled/awaiting) + awaitingBreakdown (drafts/link/expired) in one call, all computed under the SAME conditions — the /sent filter contract minus status/platform (those are the breakdown axes here, not filters). Replaces doing N separate limit=1 /sent calls just to read totals.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/count": {
+      "get": {
+        "operationId": "EngageController_countSentReplies",
+        "summary": "Filtered counts under EXACTLY the same filters as GET /sent: `total` honors every filter (status/platform/date included, same number the list returns); each breakdown honors every filter except its own axis — byPlatform drops platform, rollups and awaitingBreakdown drop status — so badges stay complete while the other filters narrow them. Pagination params are accepted and ignored, so clients can reuse the list query string verbatim.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "published",
+                "scheduled",
+                "manual",
+                "error",
+                "draft",
+                "settled",
+                "awaiting",
+                "awaiting-draft",
+                "awaiting-expired",
+                "awaiting-link"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/{id}/status": {
+      "get": {
+        "operationId": "EngageController_getSentReplyStatus",
+        "summary": "Lightweight status of one sent reply — for the frontends to poll while an in-browser extension reply posts and self-backfills. Returns { id, state, replyUrl }; replyUrl flips non-null on success.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/{id}": {
+      "get": {
+        "operationId": "EngageController_getSentReplyById",
+        "summary": "Get a single sent reply by id; response shape matches one item from /sent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      },
+      "patch": {
+        "operationId": "EngageController_updateScheduledReply",
+        "summary": "Edit content / schedule of a scheduled (QUEUE) engage reply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Reply already sent, or scheduledAt is not in the future"
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/{id}/reply-url": {
+      "patch": {
+        "operationId": "EngageController_submitManualReplyUrl",
+        "summary": "Submit the reply URL (+ optional author) for a manual reply (X or Reddit)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitManualReplyUrlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "Invalid URL format, not an X/Reddit reply, or the reply is not a posted reply awaiting its link (e.g. still a DRAFT)"
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/{id}/publish-reply": {
+      "patch": {
+        "operationId": "EngageController_publishExtensionReply",
+        "summary": "Extension publish-on-success callback: backfill the reply URL, flip the saved DRAFT to PUBLISHED, claim the opportunity, and charge — the only place the extension reply path bills. Idempotent for an already-published reply.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishExtensionReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Only valid for X or Reddit replies"
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/{id}/removed": {
+      "patch": {
+        "operationId": "EngageController_markExtensionReplyRemoved",
+        "summary": "Extension removal callback: the reply posted successfully and the platform removed it seconds later (verified from a logged-out view). Records the removal, keeps the Post PUBLISHED, dismisses the opportunity — and charges nothing, because publish-reply is never reached.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReplyRemovedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/{id}/unconfirmed": {
+      "post": {
+        "operationId": "EngageController_reportUnconfirmedReply",
+        "summary": "Report a reply whose send fired but was never confirmed: closes that record (QUEUE→ERROR) so it is never re-sent. Does NOT touch the opportunity.",
+        "description": "The extension reporting a send that FIRED but was never confirmed — dev.to's\nAJAX comment that never rendered, a Reddit comment that never joined the\ntree.\n\nCloses this one record (QUEUE → ERROR) so the driver stops offering it. The\nopportunity is untouched: unlike /target-gone, this makes no claim about the\npost existing, only about one attempt whose result could not be read.\n\nDeliberately closes a reply that MIGHT be live. Leaving it queued is worse:\nthe lease expires, the reply is handed out again, and a second copy of the\nsame comment goes up. Losing an unsent reply is recoverable by hand;\na duplicate comment on someone else's post is not — and the extension's own\nreply.unconfirmed pass looks these up on the platform and commits the ones\nthat did land.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportTargetGoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/sent/{id}/metrics": {
+      "patch": {
+        "operationId": "EngageController_ingestReplyMetrics",
+        "summary": "Persist extension-scraped metrics for one published reply. The browser extension reads the reply's own page (X TweetDetail / Reddit comment .json) and posts the raw public counters here; the server computes impressions/traffic and returns the normalized metrics so the page can update the card in place.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestReplyMetricsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "Not an X/Reddit reply, platform mismatch, or the reply has no published post to attach metrics to"
+          },
+          "404": {
+            "description": "Sent reply not found"
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/dashboard/summary": {
+      "get": {
+        "operationId": "EngageController_getDashboardSummary",
+        "summary": "Engage Performance panel: headline stats, optional platform filter, platform split, best reply",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/dashboard/replies-trend": {
+      "get": {
+        "operationId": "EngageController_getDashboardRepliesTrend",
+        "summary": "Daily Engage reply counts over a trailing window (for the Your Posts chart overlay)",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/dashboard/traffics": {
+      "get": {
+        "operationId": "EngageController_getDashboardTraffics",
+        "summary": "Total Engage traffic index plus per-reply breakdown (Traffic from Engage panel)",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/dashboard/impressions": {
+      "get": {
+        "operationId": "EngageController_getDashboardImpressions",
+        "summary": "Engage impressions trend by period and platform (daily/weekly/monthly)",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/dashboard/top-sources": {
+      "get": {
+        "operationId": "EngageController_getDashboardTopSources",
+        "summary": "Top engage traffic sources grouped by original author (Top engage sources panel)",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/admin/resync-metrics": {
+      "post": {
+        "operationId": "EngageController_resyncEngageMetrics",
+        "summary": "Re-fetch Reddit/X metrics for published engage replies with missing stats",
+        "parameters": [
+          {
+            "name": "platform",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dry_run",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/engage/admin/sync-metrics": {
+      "post": {
+        "operationId": "EngageController_syncEngageMetrics",
+        "summary": "Manually wake up engage reply-metrics collection and return before/after stats.",
+        "parameters": [
+          {
+            "name": "platform",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dry_run",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "backfill",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Engage"
+        ]
+      }
+    },
+    "/operation-plans/{id}": {
+      "get": {
+        "operationId": "OperationPlanController_getOverview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Operation Plans"
+        ]
+      }
+    },
+    "/projects/{projectId}/operation-plans/active": {
+      "get": {
+        "operationId": "OperationPlanController_getActivePlanId",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Operation Plans"
+        ]
+      }
+    },
+    "/projects/{projectId}/operation-plans": {
+      "post": {
+        "operationId": "OperationPlanController_create",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dryRun",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOperationPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operation Plans"
+        ]
+      }
+    },
+    "/projects/{projectId}/automation": {
+      "get": {
+        "operationId": "AutomationController_getOverview",
+        "summary": "A project's whole Automation surface in one call: active plan + send-queue rollup, publishing platforms and effective time windows, managed-reply config and accounts, and the new-conversation count.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/projects/{projectId}/automation/enabled": {
+      "post": {
+        "operationId": "AutomationController_saveEnabled",
+        "summary": "The project's Automation master switch. Suspends both features without touching their configuration.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationEnabledDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/projects/{projectId}/automation/publishing": {
+      "post": {
+        "operationId": "AutomationController_savePublishing",
+        "summary": "Save scheduled-publishing platforms and time windows; with `commit`, also queue the active plan for those platforms.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationPublishingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/projects/{projectId}/automation/replies": {
+      "post": {
+        "operationId": "AutomationController_saveReplies",
+        "summary": "Save managed-reply settings: the reply switch plus the per-platform reply policy. Switching replies on also switches Engage post-scanning on, and resumes the reply mode the project already had.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationRepliesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
         ]
       }
     },
@@ -4117,6 +8166,14 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -4174,6 +8231,31 @@
             }
           },
           {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationPlanId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasOperationPlan",
+            "required": false,
+            "in": "query",
+            "description": "true = only posts that belong to an OperationPlan; false = only posts without one. Ignored when operationPlanId is set.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "state",
             "required": false,
             "in": "query",
@@ -4185,6 +8267,22 @@
                 "DRAFT"
               ],
               "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "calendar",
+                  "chat",
+                  "engage"
+                ]
+              }
             }
           },
           {
@@ -4235,7 +8333,9 @@
                   "gmb",
                   "wrapcast",
                   "nostr",
-                  "vk"
+                  "vk",
+                  "quora",
+                  "hackernews"
                 ]
               }
             }
@@ -4304,7 +8404,16 @@
     "/public/v1/integrations": {
       "get": {
         "operationId": "PublicIntegrationsController_listIntegration",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -4370,6 +8479,20 @@
         ]
       }
     },
+    "/admin/social-providers": {
+      "get": {
+        "operationId": "AdminSettingsController_listSocialProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
     "/admin/settings": {
       "get": {
         "operationId": "AdminSettingsController_listSettings",
@@ -4415,22 +8538,30 @@
         "tags": [
           "Admin"
         ]
-      },
-      "post": {
-        "operationId": "AdminSettingsController_createSetting",
+      }
+    },
+    "/admin/settings/engage-initial-scan-budget": {
+      "get": {
+        "operationId": "AdminSettingsController_getEngageInitialScanBudget",
         "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSettingDto"
-              }
-            }
+        "responses": {
+          "200": {
+            "description": ""
           }
         },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/settings/extension-publish-segment-gap": {
+      "get": {
+        "operationId": "AdminSettingsController_getExtensionPublishSegmentGap",
+        "summary": "",
+        "description": "GET /admin/settings/extension-publish-segment-gap\n\nThe EFFECTIVE per-platform thread segment-gap ranges ([minSeconds,\nmaxSeconds]) the extension publish queue paces with. The stored\n`extension_publish.segment_gap` setting is `{ default: [min, max],\nplatforms: { <platform>: [min, max] } }`; each platform resolves\nplatform override → stored global default → built-in default, malformed\ntiers falling through. Edit the raw value via\nPUT /admin/settings/extension_publish.segment_gap.",
+        "parameters": [],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -4462,7 +8593,9 @@
         ]
       },
       "put": {
-        "operationId": "AdminSettingsController_updateSetting",
+        "operationId": "AdminSettingsController_upsertSetting",
+        "summary": "",
+        "description": "PUT /admin/settings/:key\n\nUpsert: creates the setting if it doesn't exist yet, otherwise updates\nits value in place. There's no separate create-only endpoint — the\nunderlying repository write is already a DB-level upsert, so layering a\ncreate/update distinction on top of it only added friction for callers.",
         "parameters": [
           {
             "name": "key",
@@ -4725,7 +8858,75 @@
                 "gmb",
                 "wrapcast",
                 "nostr",
-                "vk"
+                "vk",
+                "quora",
+                "hackernews"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "x",
+                "reddit",
+                "linkedin",
+                "linkedin-page",
+                "instagram",
+                "instagram-standalone",
+                "facebook",
+                "youtube",
+                "tiktok",
+                "pinterest",
+                "threads",
+                "mastodon",
+                "bluesky",
+                "medium",
+                "devto",
+                "hashnode",
+                "wordpress",
+                "discord",
+                "slack",
+                "telegram",
+                "dribbble",
+                "kick",
+                "twitch",
+                "lemmy",
+                "listmonk",
+                "gmb",
+                "wrapcast",
+                "nostr",
+                "vk",
+                "quora",
+                "hackernews"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "publishMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "API",
+                "EXTENSION"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "calendar",
+                "chat",
+                "engage"
               ],
               "type": "string"
             }
@@ -4784,7 +8985,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -5269,7 +9477,9 @@
                 "gmb",
                 "wrapcast",
                 "nostr",
-                "vk"
+                "vk",
+                "quora",
+                "hackernews"
               ],
               "type": "string"
             }
@@ -5317,6 +9527,22 @@
         ],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/write-limits": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkWriteLimits",
+        "summary": "",
+        "description": "GET /admin/diagnostics/write-limits\n\nHow close accounts are to the write-path ceilings (see\ndocs/engage/write-path-limits.md).\n\nReports HEAD-ROOM, not breaches, and the distinction is the point. A breach\ncount reads zero whether a limit is perfectly tuned or a thousand times too\nhigh, so it cannot tell you the limit is wrong until it already hurt\nsomeone; the distance between the busiest account and the cap can, while\nthere is still time to move it.\n\nOnly the DRAFT cap is measurable from durable state. The ingest quota and\nthe route throttles count in Redis under a short TTL, so nothing about\nyesterday survives — an accurate \"who was refused yesterday\" needs those\nrefusals persisted, which is a schema change and not done here. Until then\na refusal exists only as a logged warning (`post_draft_limit_reached`,\n`engage_ingest_quota_exceeded`, and the throttler's own 429s).",
+        "parameters": [],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -5378,6 +9604,109 @@
         "operationId": "AdminDiagnosticsController_checkErrorPosts",
         "summary": "",
         "description": "GET /admin/diagnostics/error-posts\n\nFinds recent ERROR posts (last 7 days) with their error details.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/engage-scan-cursors": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkEngageScanCursors",
+        "summary": "",
+        "description": "GET /admin/diagnostics/engage-scan-cursors\n\nFinds EngageScanCursor rows stuck in SCANNING state for more than 2 hours.\nA stuck cursor means the Temporal workflow that owns the scan exited without\nresetting it, blocking all future scans for that platform/scanType/scanKey.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/engage-scan-cursors/release": {
+      "post": {
+        "operationId": "AdminDiagnosticsController_releaseEngageScanCursor",
+        "summary": "",
+        "description": "POST /admin/diagnostics/engage-scan-cursors/release\n\nDebug-only global release for an EngageScanCursor lease. This does not\nadvance cursor fields; it only clears a fresh/stuck SCANNING lease so the\nsame platform/scanType/scanKey unit can be claimed again.",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/engage-failed-scans": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkEngageFailedScans",
+        "summary": "",
+        "description": "GET /admin/diagnostics/engage-failed-scans\n\nFinds EngageKeywordInitialScan rows that are FAILED or stuck in RUNNING\nfor more than 1 hour. Failed initial scans mean the org's keyword never\ngot a historical backfill, so users see no opportunities for that keyword.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/engage-keyword-subscribers": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkEngageKeywordSubscribers",
+        "summary": "",
+        "description": "GET /admin/diagnostics/engage-keyword-subscribers\n\nPer-keyword ACTIVATED-subscriber counts: how many orgs have each keyword\nactually running (EngageConfig.enabled AND EngageKeyword.enabled), keyed by\nthe normalized keyword so case/whitespace variants collapse. \"Activated\",\nnot merely \"added\" — a keyword on a disabled config, or a disabled keyword,\nis excluded. Live query; reflects the current enable/disable state exactly.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/engage-dead-reply-accounts": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkEngageDeadReplyAccounts",
+        "summary": "",
+        "description": "GET /admin/diagnostics/engage-dead-reply-accounts\n\nFinds project bindings with engageEnabled=true but whose linked\nIntegration has refreshNeeded=true or disabled=true. These accounts will\nsilently fail to send or auto-reply without any user-visible error.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/diagnostics/engage-reply-errors": {
+      "get": {
+        "operationId": "AdminDiagnosticsController_checkEngageReplyErrors",
+        "summary": "",
+        "description": "GET /admin/diagnostics/engage-reply-errors\n\nFinds EngageSentReply rows whose linked Post has state=ERROR within the\nlast 7 days. These represent replies the user believes were sent (the\nopportunity shows REPLIED) but that actually failed at the publish layer.",
         "parameters": [],
         "responses": {
           "200": {
@@ -5595,6 +9924,342 @@
           "Admin"
         ]
       }
+    },
+    "/admin/api-cost": {
+      "get": {
+        "operationId": "AdminApiCostController_report",
+        "summary": "Internal API cost report (super-admin)",
+        "description": "GET /admin/api-cost?from=YYYY-MM-DD&to=YYYY-MM-DD\n\nReturns the cost breakdown by platform+category and a per-day cost trend\nover [from, to). `to` is exclusive (a whole-day bucket). Defaults to the\nlast 30 days when omitted. Also echoes the active price map so the UI can\nshow unit prices without hardcoding them.",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/api-cost/business": {
+      "get": {
+        "operationId": "AdminApiCostController_business",
+        "summary": "Internal API cost by business purpose (super-admin)",
+        "description": "GET /admin/api-cost/business?from&to&organizationId\n\nSame window semantics as `/`, but broken down by BUSINESS PURPOSE\n(post_publish / engage_reply / post_metrics / engage_metrics / engage_scan /\nuser_lookup / ...) and org. Each row keeps the underlying X billing\n`category` so cost reuses the same price map. Pass `organizationId` to scope\nto one org (engage_scan rows are attributed to org '' = shared/system).",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/api-cost/engage-scores": {
+      "get": {
+        "operationId": "AdminApiCostController_engageScores",
+        "summary": "Engage score distribution (super-admin)",
+        "description": "GET /admin/api-cost/engage-scores?from&to&organizationId\n\nEngage opportunity score distribution over [from, to), grouped by\norg/platform/phase/bucket. `phase` separates 'scanned' (every\nkeyword-matched post) from 'persisted' (the >= MIN_SCORE opportunities).\nBuckets are non-overlapping: 0-50 / 50-60 / 60-70 / 70-85 / 85-100.",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/extension": {
+      "get": {
+        "operationId": "AdminExtensionController_getLatest",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/extension/upload/chrome": {
+      "post": {
+        "operationId": "AdminExtensionController_uploadChrome",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/extension/upload/firefox": {
+      "post": {
+        "operationId": "AdminExtensionController_uploadFirefox",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/engage/sent": {
+      "get": {
+        "operationId": "AdminEngageController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalPostUrl",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/engage/opportunities": {
+      "get": {
+        "operationId": "AdminEngageController_listOpportunities",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "platform",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "onlyBrokenUrls",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminEngageController_deleteOpportunities",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityDeleteBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/engage/opportunities/url": {
+      "patch": {
+        "operationId": "AdminEngageController_repairOpportunityUrls",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminOpportunityUrlBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
     }
   },
   "info": {
@@ -5691,7 +10356,7 @@
           "repeatPassword": {
             "type": "string",
             "enum": [
-              "K4rhAEnM3t"
+              "Gvst6mCQlb"
             ]
           },
           "token": {
@@ -5795,6 +10460,25 @@
           "data"
         ]
       },
+      "UserByUsernameDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "username"
+        ]
+      },
       "ConnectIntegrationDto": {
         "type": "object",
         "properties": {
@@ -5884,6 +10568,101 @@
           "shortlink"
         ]
       },
+      "MetricsWindowDto": {
+        "type": "object",
+        "properties": {
+          "metricsWindowDays": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 365
+          }
+        },
+        "required": [
+          "metricsWindowDays"
+        ]
+      },
+      "MetricsDueDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "AnalyticsPointDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "object"
+          },
+          "date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "date"
+        ]
+      },
+      "AnalyticsDataDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsPointDto"
+            }
+          },
+          "percentageChange": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "data"
+        ]
+      },
+      "MetricsIngestItemDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "analytics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsDataDto"
+            }
+          }
+        },
+        "required": [
+          "postId",
+          "analytics"
+        ]
+      },
+      "MetricsIngestDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetricsIngestItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "CreateTagDto": {
         "type": "object",
         "properties": {
@@ -5957,6 +10736,9 @@
           "integration": {
             "$ref": "#/components/schemas/Integration"
           },
+          "providerIdentifier": {
+            "type": "string"
+          },
           "value": {
             "type": "array",
             "items": {
@@ -5966,12 +10748,18 @@
           "group": {
             "type": "string"
           },
+          "publishMethod": {
+            "type": "string",
+            "enum": [
+              "extension",
+              "api"
+            ]
+          },
           "settings": {
             "type": "object"
           }
         },
         "required": [
-          "integration",
           "value",
           "group",
           "settings"
@@ -5988,11 +10776,15 @@
               "now"
             ]
           },
+          "projectId": {
+            "type": "string"
+          },
           "source": {
             "type": "string",
             "enum": [
               "calendar",
-              "chat"
+              "chat",
+              "engage"
             ]
           },
           "order": {
@@ -6116,6 +10908,127 @@
           "format",
           "tone"
         ]
+      },
+      "SchedulePostItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "publishMethod": {
+            "type": "string",
+            "enum": [
+              "extension",
+              "api"
+            ]
+          },
+          "date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "SchedulePostsDto": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchedulePostItemDto"
+            }
+          }
+        },
+        "required": [
+          "posts"
+        ]
+      },
+      "PublishedSegmentDto": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "description": "Our Post id for this segment, echoed from the due-item.",
+            "maxLength": 64
+          },
+          "url": {
+            "type": "string",
+            "description": "Permalink of this segment. Optional for the same reason as the top-level\nreleaseURL: a platform can confirm the send without yielding a URL.",
+            "maxLength": 2048
+          },
+          "releaseId": {
+            "type": "string",
+            "description": "Platform post id for this segment, stored as releaseId.",
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "postId"
+        ]
+      },
+      "MarkExtensionPublishedDto": {
+        "type": "object",
+        "properties": {
+          "releaseURL": {
+            "type": "string",
+            "description": "Permalink of the published post (the first thread segment). OPTIONAL: some\nextension-published platforms (notably Quora) confirm the post went live\nbut cannot recover its URL. Such a post is still marked PUBLISHED (so it\nleaves QUEUE and is never re-published) — just without a releaseURL, which\nonly means no clickable link and no metrics for that post.",
+            "maxLength": 2048
+          },
+          "releaseId": {
+            "type": "string",
+            "description": "Platform post id (Reddit t3_* fullname / X rest_id), stored as releaseId.",
+            "maxLength": 512
+          },
+          "segments": {
+            "description": "Per-segment results for a THREAD. The fields above describe the anchor only,\nso without this every follow-up segment is marked PUBLISHED with no URL —\non every successful thread, not just a failing one — and is therefore never\neligible for metrics. Optional for version skew: an older extension omits it\nand the follow-up segments keep the URL-less treatment.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedSegmentDto"
+            }
+          }
+        }
+      },
+      "MarkExtensionPostRemovedDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "removed",
+              "gone"
+            ]
+          },
+          "releaseURL": {
+            "type": "string",
+            "description": "The post's own permalink, when the poster captured one.",
+            "maxLength": 2048
+          },
+          "evidence": {
+            "type": "string",
+            "description": "What the check actually saw, for diagnosing a verdict that turns out wrong.",
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "MarkExtensionPublishFailedDto": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "segments": {
+            "description": "Segments that DID publish before the failure, in publish order. An empty or\nabsent list means nothing went out (the classic total failure).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedSegmentDto"
+            }
+          }
+        }
       },
       "VideoDto": {
         "type": "object",
@@ -6391,6 +11304,1063 @@
           "content"
         ]
       },
+      "ScanIngestRawDataDto": {
+        "type": "object",
+        "properties": {
+          "mediaUrls": {
+            "description": "X only: direct URLs of the photos/videos attached to the tweet. X's body\ncarries only a t.co placeholder for those, which postContent strips —\nx.com renders them as an attachment, not as text — so the real URLs would\notherwise be lost. A tweet carries at most 4 photos or 1 video.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "postContentType": {
+            "type": "string",
+            "description": "X only: marks this post as an X Article (long-form) rather than a plain\ntweet. X's search timeline mixes the two in with no separate shape, so the\nextension flags it here — code that treats postContent as a full tweet\nbody should know it is instead an article preview.",
+            "enum": [
+              "article"
+            ]
+          }
+        }
+      },
+      "ScanIngestPostDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "externalPostId": {
+            "type": "string"
+          },
+          "externalPostUrl": {
+            "type": "string"
+          },
+          "authorUsername": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "The post's own title where the platform has one (Quora question, Reddit /\nHN / dev.to / Medium headline). Optional: X and LinkedIn have no title, and\nan older extension build sends none — it folded the title into postContent\ninstead, which stays valid (postSearchText treats both shapes alike)."
+          },
+          "postContent": {
+            "type": "string"
+          },
+          "postPublishedAt": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string"
+          },
+          "channelName": {
+            "type": "string"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "authorAvatarUrl": {
+            "type": "string"
+          },
+          "authorFollowers": {
+            "type": "number",
+            "minimum": 0
+          },
+          "channelFollowers": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricLikes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricReplies": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricRetweets": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricQuotes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricBookmarks": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricViews": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricShares": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricSaves": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metricScore": {
+            "type": "number"
+          },
+          "metricUpvoteRatio": {
+            "type": "number"
+          },
+          "metricComments": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rawData": {
+            "$ref": "#/components/schemas/ScanIngestRawDataDto"
+          }
+        },
+        "required": [
+          "platform",
+          "externalPostId",
+          "externalPostUrl",
+          "authorUsername",
+          "postContent",
+          "postPublishedAt"
+        ]
+      },
+      "ScanIngestCursorDto": {
+        "type": "object",
+        "properties": {
+          "lastSeenExternalId": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "type": "string"
+          }
+        }
+      },
+      "EngageScanIngestDto": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanIngestPostDto"
+            }
+          },
+          "nextCursor": {
+            "$ref": "#/components/schemas/ScanIngestCursorDto"
+          },
+          "exhausted": {
+            "type": "boolean",
+            "description": "True when the extension reached the end / hit maxPages (no backlog left)."
+          }
+        },
+        "required": [
+          "taskId",
+          "posts"
+        ]
+      },
+      "ScanUnitSelectorDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "x",
+              "reddit",
+              "linkedin",
+              "devto",
+              "hackernews",
+              "medium",
+              "quora"
+            ]
+          },
+          "scanType": {
+            "type": "string",
+            "enum": [
+              "keyword",
+              "channel",
+              "tracked"
+            ]
+          },
+          "scanKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform",
+          "scanType",
+          "scanKey"
+        ]
+      },
+      "EngageScanSyncDto": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "$ref": "#/components/schemas/EngageScanIngestDto"
+          },
+          "want": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Debug/admin: bypass the cadence gate and claim units that are still in cooldown."
+          },
+          "selectedUnits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanUnitSelectorDto"
+            }
+          }
+        }
+      },
+      "EngageScanPostsIngestDto": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanIngestPostDto"
+            }
+          }
+        },
+        "required": [
+          "posts"
+        ]
+      },
+      "SaveEngageConfigDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "autoReplyEnabled": {
+            "type": "boolean",
+            "description": "Unattended reply mode for this project's Engage.\n  'off'    — the plan's daily reply targets stay a send-time CEILING on\n             replies a user initiates (the behaviour before this existed).\nOn, the backend drafts up to the day's budget and the browser extension\nsends them unattended.\n\nReplaces the tri-state `autoReplyMode`, whose third value `review` parked\ndrafts for a human to send. That mode is retired: managed replying always\nsends, and no client ever set anything but `review`, which made the enum a\nboolean in disguise. Stored rows carrying the old key are still read\ncorrectly — see `readEngageConfigMetadata`.\n\nRequires a projectId: the driver only reads project-scoped configs, so a\nswitch set on the legacy null-project row would be silently inert."
+          },
+          "replyPolicies": {
+            "type": "object",
+            "description": "Per-PLATFORM reply policy, keyed by platform:\n  { \"reddit\": { autoReplyEnabled, windowStart, windowEnd, timezone,\n                defaultStrategy } }\nRefines autoReplyEnabled (which decides WHETHER this project replies at all)\nwith WHERE and WHEN. Replaces the key wholesale — send the full map."
+          },
+          "projectId": {
+            "type": "string"
+          }
+        }
+      },
+      "AddKeywordDto": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "CORE",
+              "BRAND",
+              "COMPETITOR"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyword"
+        ]
+      },
+      "AddMonitoredChannelDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "reddit"
+            ]
+          },
+          "channelId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "channelName": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "audienceSize": {
+            "type": "number",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform",
+          "channelId",
+          "channelName"
+        ]
+      },
+      "AddTrackedAccountDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "platform": {
+            "type": "string"
+          },
+          "picture": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "categoryLabel": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "username"
+        ]
+      },
+      "SetupEngageDto": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddKeywordDto"
+            }
+          },
+          "monitoredChannels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddMonitoredChannelDto"
+            }
+          },
+          "trackedAccounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddTrackedAccountDto"
+            }
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "keywords"
+        ]
+      },
+      "AddKeywordsBulkDto": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddKeywordDto"
+            }
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "keywords"
+        ]
+      },
+      "UpdateKeywordDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "CORE",
+              "BRAND",
+              "COMPETITOR",
+              null
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateMonitoredChannelDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "channelName": {
+            "type": "string"
+          },
+          "audienceSize": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "RedditFlairOptionDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "ReportRedditChannelCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "subreddit": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "flairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RedditFlairOptionDto"
+            }
+          },
+          "flairRequired": {
+            "type": "boolean"
+          },
+          "titleTagRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subreddit"
+        ]
+      },
+      "SearchChannelsDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "platform",
+          "query"
+        ]
+      },
+      "UpdateTrackedAccountDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "picture": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "categoryLabel": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      },
+      "UpdateReplyAccountDto": {
+        "type": "object",
+        "properties": {
+          "engageEnabled": {
+            "type": "boolean"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        }
+      },
+      "RefreshMetricsDto": {
+        "type": "object",
+        "properties": {
+          "postIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "postIds"
+        ]
+      },
+      "ReportTargetGoneDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Whether the PLATFORM itself said the address does not resolve (HTTP\n404/410), as opposed to the extension inferring it from page text.\n\nThe one field here that is NOT diagnostic — it selects the blast radius.\n`EngageOpportunity` is a globally-shared row with no un-retire path, so only\na confirmed report may retire it for every tenant; an unconfirmed one closes\njust the caller's own reply. Page text cannot separate \"deleted for\neveryone\" from \"invisible to this session\" (a protected account, a private\ncommunity, an author who blocked that one login).\n\nAbsent means UNCONFIRMED. An older extension sends nothing, and the safe\nreading of silence is the narrow action, never the global one."
+          }
+        }
+      },
+      "GenerateDraftDto": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "EXPERT_ANSWER",
+              "DATA_BACKED",
+              "EMPATHY_LED",
+              "CONTRARIAN",
+              "QUESTION_LED",
+              "QUICK_TAKE",
+              "AMPLIFY"
+            ]
+          },
+          "brandStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "outputLength": {
+            "type": "number",
+            "minimum": 2
+          },
+          "length": {
+            "type": "string",
+            "enum": [
+              "short",
+              "medium",
+              "long"
+            ]
+          }
+        },
+        "required": [
+          "strategy",
+          "brandStrength"
+        ]
+      },
+      "SaveDraftDto": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "draftContent": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "EXPERT_ANSWER",
+              "DATA_BACKED",
+              "EMPATHY_LED",
+              "CONTRARIAN",
+              "QUESTION_LED",
+              "QUICK_TAKE",
+              "AMPLIFY"
+            ]
+          },
+          "brandStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        },
+        "required": [
+          "draftContent",
+          "strategy",
+          "brandStrength"
+        ]
+      },
+      "GenerateReferencePostDto": {
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "EXPERT_ANSWER",
+              "DATA_BACKED",
+              "EMPATHY_LED",
+              "CONTRARIAN",
+              "QUESTION_LED",
+              "QUICK_TAKE",
+              "AMPLIFY"
+            ]
+          },
+          "brandStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "outputLength": {
+            "type": "number",
+            "minimum": 2
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "sourceAdaptation": {
+            "type": "string",
+            "enum": [
+              "PRESERVE_STRUCTURE",
+              "REFRAME",
+              "FRESH_ANGLE"
+            ]
+          },
+          "includeReferenceMedia": {
+            "type": "boolean"
+          },
+          "thread": {
+            "type": "boolean"
+          },
+          "maxThreadParts": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "strategy",
+          "brandStrength"
+        ]
+      },
+      "SendReplyDto": {
+        "type": "object",
+        "properties": {
+          "integrationId": {
+            "type": "string"
+          },
+          "draftContent": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "EXPERT_ANSWER",
+              "DATA_BACKED",
+              "EMPATHY_LED",
+              "CONTRARIAN",
+              "QUESTION_LED",
+              "QUICK_TAKE",
+              "AMPLIFY"
+            ]
+          },
+          "brandStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "integrationId",
+          "draftContent",
+          "strategy",
+          "brandStrength"
+        ]
+      },
+      "ScheduleReplyDto": {
+        "type": "object",
+        "properties": {
+          "integrationId": {
+            "type": "string"
+          },
+          "draftContent": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "EXPERT_ANSWER",
+              "DATA_BACKED",
+              "EMPATHY_LED",
+              "CONTRARIAN",
+              "QUESTION_LED",
+              "QUICK_TAKE",
+              "AMPLIFY"
+            ]
+          },
+          "brandStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "integrationId",
+          "draftContent",
+          "strategy",
+          "brandStrength",
+          "scheduledAt"
+        ]
+      },
+      "BatchScheduleReplyDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleReplyDto"
+            }
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "BatchSendReplyDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SendReplyDto"
+            }
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ConfirmManualReplyDto": {
+        "type": "object",
+        "properties": {
+          "draftContent": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "EXPERT_ANSWER",
+              "DATA_BACKED",
+              "EMPATHY_LED",
+              "CONTRARIAN",
+              "QUESTION_LED",
+              "QUICK_TAKE",
+              "AMPLIFY"
+            ]
+          },
+          "brandStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "replyUrl": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "integrationId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "draftContent",
+          "strategy",
+          "brandStrength"
+        ]
+      },
+      "UpdateScheduledReplyDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "scheduledAt": {
+            "type": "string"
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "EXPERT_ANSWER",
+              "DATA_BACKED",
+              "EMPATHY_LED",
+              "CONTRARIAN",
+              "QUESTION_LED",
+              "QUICK_TAKE",
+              "AMPLIFY"
+            ]
+          },
+          "brandStrength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        }
+      },
+      "EngageAuthorDto": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "avatarUrl": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "handle"
+        ]
+      },
+      "SubmitManualReplyUrlDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "author": {
+            "$ref": "#/components/schemas/EngageAuthorDto"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "PublishExtensionReplyDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "author": {
+            "$ref": "#/components/schemas/EngageAuthorDto"
+          }
+        }
+      },
+      "MarkReplyRemovedDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "removed",
+              "gone"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "IngestReplyMetricsDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "x",
+              "reddit",
+              "devto"
+            ]
+          },
+          "impressions": {
+            "type": "number"
+          },
+          "likes": {
+            "type": "number"
+          },
+          "replies": {
+            "type": "number"
+          },
+          "retweets": {
+            "type": "number"
+          },
+          "quotes": {
+            "type": "number"
+          },
+          "bookmarks": {
+            "type": "number"
+          },
+          "score": {
+            "type": "number"
+          },
+          "comments": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "platform"
+        ]
+      },
+      "CreateOperationPlanDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SaveAutomationEnabledDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "SaveAutomationPublishingDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "The scheduled-publishing feature switch. Omit to leave it as it is — a\nclient changing only the platform list should not have to restate it.\n\nIndependent from `platforms`: turning the feature off keeps the platform\nselection intact so it comes back unchanged, which is why this is a column\nof its own rather than \"is the list empty\"."
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "windows": {
+            "type": "object"
+          },
+          "commit": {
+            "type": "boolean",
+            "description": "Also commit the project's active plan to the send queue (DRAFT -> QUEUE),\nscoped to `platforms`. Omitted/false saves the settings only.\n\nFolded into this one call because \"choose platforms, then confirm\" was two\nround trips with an observable half-applied state between them: settings\nsaved, nothing queued."
+          },
+          "publishMethod": {
+            "type": "string",
+            "enum": [
+              "extension",
+              "api"
+            ]
+          }
+        },
+        "required": [
+          "platforms"
+        ]
+      },
+      "SaveAutomationRepliesDto": {
+        "type": "object",
+        "properties": {
+          "autoReplyEnabled": {
+            "type": "boolean",
+            "description": "The managed-reply switch — the ONLY switch this endpoint accepts, because\nthe Automation page has exactly one control for replying.\n\nTwo other switches deliberately have no field here:\n\n`EngageConfig.enabled` (post scanning) belongs to the Engage page. A second\ntoggle beside this one gave the Automation page two switches for what a user\nexperiences as one decision, with a silent failure mode — replying on,\nscanning off, nothing discovered, nothing to reply to, and no control on\nthis page that explains why. `AutomationService.saveReplies` switches it on\nwith replying instead, so the client cannot forget it.\n\nThere is no reply MODE beside it either. Managed replying has one behaviour\n— the backend drafts, the extension sends — so the retired tri-state's\n`review` (\"park it for a human\") described something the product does not\ndo, and every client that ever wrote the field wrote the same value."
+          },
+          "policies": {
+            "type": "object",
+            "description": "Per-platform REPLY policy (strategy, length, mention tags, pacing…).\n\nThis is the COMPLETE set, not a delta — the same shape rule as\n`SaveAutomationPublishingDto.platforms`, for the same reason. A platform\nabsent from the map has its reply policy CLEARED, and `{}` clears every\nplatform. Under a merge, \"stop replying on reddit\" and \"reset this panel\"\nare inexpressible: a client can only overwrite keys whose names it knows, so\na key it has never heard of outlives every save it makes.\n\n  stored { x: {…}, reddit: {…} } + { x: {…} }  ->  x kept, reddit cleared\n  stored { x: {…}, reddit: {…} } + {}          ->  both cleared\n\nOnly the reply half is replaced. Publishing keys (`publishingEnabled`,\n`publishingWindow*`, `publishingTimezone`) currently share this column but\nbelong to the publishing endpoint: they survive a clear, and any that a\ncaller sends here are ignored.\n\nOmit the field entirely to leave every policy untouched. That, not `{}`, is\nhow a client flips only `autoReplyEnabled`."
+          }
+        }
+      },
       "UploadDto": {
         "type": "object",
         "properties": {
@@ -6400,27 +12370,6 @@
         },
         "required": [
           "url"
-        ]
-      },
-      "CreateSettingDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string"
-          },
-          "value": {
-            "type": "object"
-          },
-          "type": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "value"
         ]
       },
       "UpdateSettingDto": {
@@ -6495,6 +12444,49 @@
           "image"
         ]
       },
+      "AdminOpportunityUrlItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "externalPostUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "externalPostUrl"
+        ]
+      },
+      "AdminOpportunityUrlBodyDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminOpportunityUrlItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AdminOpportunityDeleteBodyDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
       "GetPostsDto": {
         "type": "object",
         "properties": {
@@ -6515,6 +12507,16 @@
           "customer": {
             "type": "string"
           },
+          "projectId": {
+            "type": "string"
+          },
+          "operationPlanId": {
+            "type": "string"
+          },
+          "hasOperationPlan": {
+            "type": "boolean",
+            "description": "true = only posts that belong to an OperationPlan; false = only posts without one. Ignored when operationPlanId is set."
+          },
           "state": {
             "type": "string",
             "enum": [
@@ -6523,6 +12525,22 @@
               "ERROR",
               "DRAFT"
             ]
+          },
+          "source": {
+            "type": "array",
+            "enum": [
+              "calendar",
+              "chat",
+              "engage"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "calendar",
+                "chat",
+                "engage"
+              ]
+            }
           },
           "integrationId": {
             "type": "array",
@@ -6561,7 +12579,9 @@
               "gmb",
               "wrapcast",
               "nostr",
-              "vk"
+              "vk",
+              "quora",
+              "hackernews"
             ],
             "items": {
               "type": "string",
@@ -6594,7 +12614,9 @@
                 "gmb",
                 "wrapcast",
                 "nostr",
-                "vk"
+                "vk",
+                "quora",
+                "hackernews"
               ]
             }
           }
@@ -6664,7 +12686,9 @@
               "gmb",
               "wrapcast",
               "nostr",
-              "vk"
+              "vk",
+              "quora",
+              "hackernews"
             ],
             "description": "Filter by provider type (e.g. x, reddit, linkedin)",
             "items": {
@@ -6698,12 +12722,40 @@
                 "gmb",
                 "wrapcast",
                 "nostr",
-                "vk"
+                "vk",
+                "quora",
+                "hackernews"
               ]
             }
           },
           "sourcePostId": {
             "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "operationPlanId": {
+            "type": "string"
+          },
+          "hasOperationPlan": {
+            "type": "boolean",
+            "description": "true = only posts that belong to an OperationPlan; false = only posts without one. Ignored when operationPlanId is set."
+          },
+          "source": {
+            "type": "array",
+            "enum": [
+              "calendar",
+              "chat",
+              "engage"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "calendar",
+                "chat",
+                "engage"
+              ]
+            }
           },
           "view": {
             "type": "string",
@@ -6792,7 +12844,9 @@
               "gmb",
               "wrapcast",
               "nostr",
-              "vk"
+              "vk",
+              "quora",
+              "hackernews"
             ],
             "description": "Filter by provider type (e.g. x, reddit, linkedin)",
             "items": {
@@ -6826,12 +12880,40 @@
                 "gmb",
                 "wrapcast",
                 "nostr",
-                "vk"
+                "vk",
+                "quora",
+                "hackernews"
               ]
             }
           },
           "sourcePostId": {
             "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "operationPlanId": {
+            "type": "string"
+          },
+          "hasOperationPlan": {
+            "type": "boolean",
+            "description": "true = only posts that belong to an OperationPlan; false = only posts without one. Ignored when operationPlanId is set."
+          },
+          "source": {
+            "type": "array",
+            "enum": [
+              "calendar",
+              "chat",
+              "engage"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "calendar",
+                "chat",
+                "engage"
+              ]
+            }
           },
           "view": {
             "type": "string",

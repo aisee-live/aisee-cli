@@ -1,6 +1,6 @@
 # AISee CLI — Backend API Alignment Plan
 
-**Status:** Approved — Phase 1 landed; Phases 2-3 pending
+**Status:** Approved — Phases 1-2 landed; Phase 3 pending
 **Date:** 2026-09-03
 **CLI version:** 0.6.1
 
@@ -326,7 +326,7 @@ Phase 2; that contradiction is resolved here in favour of Phase 2.)*
 | 8 | Shared `api-error.ts` with typed backend error codes | new `clients/api-error.ts` |
 | 9 | Contract tests for all of the above | new `tests/` |
 
-### Phase 2 — `0.7.0`, project scoping + extension awareness
+### Phase 2 — `0.7.0`, project scoping + extension awareness — IMPLEMENTED
 | # | Change | Files |
 |---|---|---|
 | 10 | `--project <url\|domain\|uuid>` resolution helper (§6) | new `utils/project.ts` |

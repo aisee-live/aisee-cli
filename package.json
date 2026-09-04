@@ -23,6 +23,7 @@
   ],
   "scripts": {
     "start": "bun run src/index.ts",
+    "test": "bun test",
     "patch-deps": "node scripts/patch-deps.js",
     "build": "bun run patch-deps && bun run build:js && bun run build:bin",
     "build:js": "bun build ./src/index.ts --outfile ./bin/aisee.js --target node",

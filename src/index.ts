@@ -19,6 +19,7 @@ import {
   postCreateModule,
   postListModule,
   postDashboardModule,
+  postPendingModule,
   postPublishModule,
   postScheduleModule,
   channelListModule,
@@ -135,6 +136,7 @@ async function main() {
   registry.register("post.create", postCreateModule);
   registry.register("post.list", postListModule);
   registry.register("post.dashboard", postDashboardModule);
+  registry.register("post.pending", postPendingModule);
   registry.register("post.publish", postPublishModule);
   registry.register("post.schedule", postScheduleModule);
   registry.register("channels.list", channelListModule);
@@ -206,6 +208,7 @@ async function main() {
   post.addCommand(buildAiseeCommand(makeDescriptor("post.create", postCreateModule), executor, 1000, "create"));
   post.addCommand(withVerbose(buildAiseeCommand(makeDescriptor("post.list", postListModule), executor, 1000, "list")));
   post.addCommand(buildAiseeCommand(makeDescriptor("post.dashboard", postDashboardModule), executor, 1000, "dashboard"));
+  post.addCommand(buildAiseeCommand(makeDescriptor("post.pending", postPendingModule), executor, 1000, "pending"));
   post.addCommand(withPositionals(
     buildAiseeCommand(makeDescriptor("post.publish", postPublishModule), executor, 1000, "publish"),
     "id",

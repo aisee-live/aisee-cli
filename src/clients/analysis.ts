@@ -1,22 +1,30 @@
 import { analysisAxios } from "./http.ts";
 import { UserError } from "../utils/errors.ts";
+import { cx } from "./api-error.ts";
 import { getDomain } from "../utils/url.ts";
 
-function extractApiError(err: unknown): UserError {
-  const e = err as { response?: { status?: number; data?: unknown } };
-  const data = e.response?.data;
-  let detail: string | undefined;
-  if (data && typeof data === "object") {
-    const d = data as Record<string, unknown>;
-    detail = (d.detail ?? d.message ?? d.error) as string | undefined;
-  }
-  const status = e.response?.status;
-  const prefix = status ? `[${status}] ` : "";
-  return new UserError(`${prefix}${detail ?? String(err)}`);
-}
+/**
+ * Terminal + in-flight states of `POST /action/{id}/generate-tasks` and
+ * `GET /action/{id}/generated-tasks`. `unnecessary` and `unsupported` are
+ * successful pre-flight outcomes; only `failed` is an error.
+ */
+export type SuggestionStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "unnecessary"
+  | "unsupported"
+  | "failed";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const cx = (p: Promise<any>): Promise<any> => p.catch((err: unknown): never => { throw extractApiError(err); });
+export interface SuggestionResult {
+  status: SuggestionStatus;
+  task_id?: string;
+  tasks?: unknown[];
+  reason?: string;
+  message?: string;
+  error?: { kind?: string; message?: string; terminal?: boolean; failed_at?: string };
+  [k: string]: unknown;
+}
 
 export interface TaskTreeNode {
   task: {
@@ -160,7 +168,7 @@ export const analysisClient = {
     return response.data;
   },
 
-  async getReport(url: string, options: { version?: string; section?: string; user_id?: string } = {}) {
+  async getReport(url: string, options: { version?: string; user_id?: string } = {}) {
     const productId = getDomain(url);
     if (options?.version) {
       const response = await cx(analysisAxios.get(`/task`, {
@@ -175,9 +183,9 @@ export const analysisClient = {
       }
       return { success: false, error: `Version ${options.version} not found` };
     } else {
-      const response = await cx(analysisAxios.get(`/task/product-latest-tasks/${encodeURIComponent(productId)}`, {
-        params: { section: options.section }
-      }));
+      // `product-latest-tasks` accepts only `status`; report sections are a
+      // client-side view over the returned result, not a server-side filter.
+      const response = await cx(analysisAxios.get(`/task/product-latest-tasks/${encodeURIComponent(productId)}`));
       return response.data;
     }
   },
@@ -211,48 +219,75 @@ export const analysisClient = {
     return result.items;
   },
 
-  async pollUntilDone(taskId: string, label: string, intervalMs = 2000, timeoutMs = 120000): Promise<void> {
+  /**
+   * Poll the read-only generation endpoint until the action reaches a terminal
+   * status.
+   *
+   * `GET /action/{id}/generated-tasks` acquires no row lock, never dispatches
+   * and never charges — unlike re-POSTing `generate-tasks`, which is what this
+   * client used to do while polling `/task/detail/{id}`.
+   */
+  async pollGeneratedTasks(
+    actionId: string,
+    label = "Generating suggestions...",
+    intervalMs = 2000,
+    timeoutMs = 180000,
+  ): Promise<SuggestionResult> {
     const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     const isTTY = process.stderr.isTTY;
+    const clear = () => {
+      if (isTTY) process.stderr.write("\r" + " ".repeat(label.length + 4) + "\r");
+    };
     let frame = 0;
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      const response = await cx(analysisAxios.get(`/task/detail/${taskId}`));
-      const data = response.data as { status?: string };
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+
+      const response = await cx(analysisAxios.get(`/action/${actionId}/generated-tasks`));
+      const data = response.data as SuggestionResult;
 
       if (isTTY) {
         process.stderr.write(`\r${frames[frame % frames.length]} ${label}`);
         frame++;
       }
 
-      if (data.status === "completed") {
-        if (isTTY) process.stderr.write("\r" + " ".repeat(label.length + 4) + "\r");
-        return;
+      if (data.status !== "processing" && data.status !== "pending") {
+        clear();
+        return data;
       }
-      if (data.status === "failed") {
-        if (isTTY) process.stderr.write("\r" + " ".repeat(label.length + 4) + "\r");
-        throw new UserError(`Task failed`);
-      }
-
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
 
-    if (isTTY) process.stderr.write("\r" + " ".repeat(label.length + 4) + "\r");
-    throw new UserError(`Task ${taskId} did not complete within ${timeoutMs / 1000}s`);
+    clear();
+    throw new UserError(
+      `Suggestion generation for action ${actionId} did not finish within ${timeoutMs / 1000}s. ` +
+      `It is still running — re-run this command to pick up the result.`,
+    );
   },
 
-  async getSuggestion(actionId: string) {
-    const response = await cx(analysisAxios.post(`/action/${actionId}/generate-tasks`, null, {
-      params: { content_days: 0 }
-    }));
-    const data = response.data as { task_id?: string; status?: string };
-    if (data.task_id && data.status !== "completed" && data.status !== "failed") {
-      await analysisClient.pollUntilDone(data.task_id, "Generating suggestions...");
-      const result = await cx(analysisAxios.post(`/action/${actionId}/generate-tasks`, null, {
-        params: { content_days: 0 }
-      }));
-      return result.data;
+  /**
+   * Dispatch suggestion generation for an action and return its terminal state.
+   *
+   * `content_days` is only sent when the caller asks for it: the server default
+   * (ACTION_TASK_CONTENT_DAYS, currently 1) is what produces the CONTENT items
+   * `aisee action-post` consumes, and hardcoding 0 here disabled them entirely.
+   *
+   * `unnecessary` and `unsupported` are terminal SUCCESS states, not errors —
+   * the action needs no fix, or has no playbook coverage. Callers render them.
+   */
+  async getSuggestion(
+    actionId: string,
+    options: { contentDays?: number } = {},
+  ): Promise<SuggestionResult> {
+    const config = options.contentDays !== undefined
+      ? { params: { content_days: options.contentDays } }
+      : undefined;
+
+    const response = await cx(analysisAxios.post(`/action/${actionId}/generate-tasks`, null, config));
+    const data = response.data as SuggestionResult;
+
+    if (data.status === "processing") {
+      return analysisClient.pollGeneratedTasks(actionId);
     }
     return data;
   },

@@ -134,7 +134,17 @@ Get detailed AI-generated implementation suggestions for an action.
 
 ```bash
 aisee action-suggest abc-123
+aisee action-suggest abc-123 --content-days 3
 ```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<action-id>` | required | Action ID |
+| `--content-days <n>` | *server default* | Days of ready-to-publish social posts to generate (1 per day). `0` disables them — which also leaves `aisee action-post` with nothing to post. |
+
+Two outcomes are reported rather than treated as errors: **`unnecessary`** (the item is already at
+or above its target score) and **`unsupported`** (the gap has no playbook coverage yet and needs
+manual review). Neither runs the model, and neither is charged.
 
 ### `aisee action-post <action-id>`
 Create social media posts from an action's implementation suggestions. Discovers target channels automatically from the product configuration.
@@ -147,6 +157,7 @@ aisee action-post abc-123
 |---|---|---|
 | `<action-id>` | required | Action ID |
 | `--channel-id <id>` | — | Only post to this channel ID |
+
 
 ---
 
@@ -167,7 +178,28 @@ aisee post create --channel <channel id> --text "Caption" --image ./photo.jpg
 | `--text <content>` | — | Direct post text |
 | `--file <path>` | — | Path to a Markdown file (alternative to `--text`) |
 | `--schedule <iso>` | — | Scheduled publication time (ISO 8601) |
+| `--draft` | false | Create as a draft; commit it later with `aisee post publish <id>` |
 | `--image <path>` | — | Local image file to attach |
+
+**Platform-specific flags.** Some platforms require a value that cannot be derived from the post
+body. Passing one that the target platform does not use is harmless.
+
+| Flag | Required by | Description |
+|---|---|---|
+| `--title <text>` | *(optional everywhere)* | Overrides the title taken from the first line of the post |
+| `--subreddit <name>` | reddit | Target subreddit, with or without `r/` |
+| `--board <id>` | pinterest | Board ID |
+| `--channel-target <id>` | discord, slack, wrapcast | Target channel ID |
+| `--publication <id>` | hashnode | Publication ID |
+| `--tags <a,b>` | hashnode | Tag labels (also accepted by devto, medium, youtube) |
+| `--list <id>` | listmonk | Mailing-list ID |
+| `--community <id>` | lemmy | Numeric community ID |
+
+> **Not every post is sent by the server.** Platforms routed to the browser extension
+> (`hackernews`, `medium`, `quora` by default, and possibly `x`, `reddit`, `linkedin`, `devto`
+> depending on the deployment) are published from your own signed-in Chrome by the AISee browser
+> extension — not from the backend. Those posts stay in `QUEUE` until that browser runs. The
+> command reports the resolved send path, and `aisee post pending` counts what is waiting.
 
 ### `aisee post list`
 List recent posts with optional status filter.
@@ -195,14 +227,36 @@ aisee post dashboard --period 30d --channel x
 
 | Flag | Default | Description |
 |---|---|---|
-| `--period <p>` | `7d` | `24h`, `7d`, `30d`, `90d` |
-| `--channel <name>` | — | Filter by platform name |
+| `--period <p>` | `7d` | `24h`, `7d`, `30d`, `90d` — translated to a whole-day date window in your timezone |
+| `--channel <a,b>` | — | Comma-separated platform names (e.g. `x,reddit`) |
+| `--integration <a,b>` | — | Comma-separated integration IDs |
 
 ### `aisee post publish <id>`
-Publish a prepared post immediately.
+Commit a **draft** post to the send queue (`DRAFT` → `QUEUE`). This is where the send path
+(extension vs backend API) is resolved and recorded.
 
 ```bash
+aisee post create --channel <channel id> --text "Hello" --draft
 aisee post publish abc-123
+aisee post publish abc-123 --publish-method api
+aisee post publish abc-123 --retry
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `<id>` | required | Post ID |
+| `--retry` | false | Retry a post in `ERROR` state instead of committing a draft. Requires a connected account. |
+| `--publish-method <m>` | — | Force `extension` or `api`; omit to let the backend resolve it |
+
+A post already in `QUEUE` or `PUBLISHED` is reported as a no-op, not as a fresh publish. Committing
+a post in `ERROR` fails with `INVALID_STATE` — use `--retry` for those.
+
+### `aisee post pending`
+Count posts waiting for the browser extension to publish. Organization-wide: the underlying
+endpoint takes no filters.
+
+```bash
+aisee post pending
 ```
 
 ### `aisee post schedule <id> <time>`

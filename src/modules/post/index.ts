@@ -1,10 +1,43 @@
 import { z } from "zod";
-import { postAgentClient, type MediaObject } from "../../clients/post-agent.ts";
+import { postAgentClient, VALID_CHANNELS, type MediaObject, type PlatformOptions } from "../../clients/post-agent.ts";
 import { analysisClient } from "../../clients/analysis.ts";
 import { UserError } from "../../utils/errors.ts";
 import { productUrlSchema, getDomain } from "../../utils/url.ts";
 import open from "open";
 import { loadSettingsWithSource } from "../../utils/config.ts";
+
+/**
+ * The backend never sends an EXTENSION-routed post itself — the user's own
+ * Chrome does, via the extension's publish-due loop. A post that comes back
+ * QUEUE on that path was not published, and saying nothing about it is how a
+ * user ends up waiting on a post that will never go out.
+ */
+function extensionNotice(publishMethod: unknown): string | undefined {
+  if (String(publishMethod ?? "").toUpperCase() !== "EXTENSION") return undefined;
+  return (
+    "Queued for the AISee browser extension — it publishes from your signed-in Chrome, " +
+    "not from the server. It stays in QUEUE until that browser is running."
+  );
+}
+
+function splitList(value: unknown): string[] | undefined {
+  if (typeof value !== "string") return undefined;
+  const parts = value.split(",").map(v => v.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : undefined;
+}
+
+function collectPlatformOptions(input: any): PlatformOptions {
+  return {
+    title: input.title,
+    subreddit: input.subreddit,
+    board: input.board,
+    channelTarget: input.channel_target,
+    publication: input.publication,
+    list: input.list,
+    community: input.community,
+    tags: splitList(input.tags),
+  };
+}
 
 export const postCreateModule = {
   description: "Create and prepare a new social media post for one or more channels",
@@ -13,13 +46,18 @@ export const postCreateModule = {
     file: z.string().optional().describe("Path to a local Markdown file to use as post content"),
     channel: z.string().describe("Channel ID"),
     schedule: z.string().optional().describe("Desired publication time (ISO 8601 format)"),
-    image: z.string().optional().describe("Local path to an image file to attach as media")
+    draft: z.boolean().default(false).describe("Create as a draft — commit it later with 'aisee post publish <id>'"),
+    image: z.string().optional().describe("Local path to an image file to attach as media"),
+    title: z.string().optional().describe("Title for platforms that require one (default: first line of the post)"),
+    subreddit: z.string().optional().describe("reddit: target subreddit"),
+    board: z.string().optional().describe("pinterest: board ID"),
+    channel_target: z.string().optional().describe("discord/slack/wrapcast: target channel ID"),
+    publication: z.string().optional().describe("hashnode: publication ID"),
+    list: z.string().optional().describe("listmonk: mailing list ID"),
+    community: z.string().optional().describe("lemmy: numeric community ID"),
+    tags: z.string().optional().describe("Comma-separated tags (hashnode, devto, youtube, medium)")
   }),
-  outputSchema: z.object({
-    id: z.string().describe("Unique identifier of the created post"),
-    status: z.string().describe("Initial workflow status"),
-    channels: z.array(z.string()).optional().describe("Targeted channel IDs")
-  }),
+  outputSchema: z.any(),
   async execute(input: any) {
     let content = input.text;
 
@@ -29,7 +67,11 @@ export const postCreateModule = {
     }
 
     if (!content) {
-      throw new Error("Either 'text' or 'file' must be provided.");
+      throw new UserError("Either 'text' or 'file' must be provided.");
+    }
+
+    if (input.draft && input.schedule) {
+      throw new UserError("--draft and --schedule are mutually exclusive: a draft has no publish time yet.");
     }
 
     let media: MediaObject[] = [];
@@ -41,31 +83,46 @@ export const postCreateModule = {
       text: content,
       channels: [input.channel],
       schedule: input.schedule,
+      draft: input.draft === true,
       media,
+      platformOptions: collectPlatformOptions(input),
     });
 
     const effectiveFmt = getFmt();
     const rows: Record<string, unknown>[] = Array.isArray(results) ? results : [results];
+    const notices = [...new Set(rows.map(r => extensionNotice(r.publishMethod)).filter(Boolean))] as string[];
+    // A draft/schedule response carries no state at all; the previous code
+    // invented one, reporting "SENT" for posts that had not been sent.
+    const stateOf = (r: Record<string, unknown>) =>
+      r.state ?? (input.draft ? "DRAFT" : input.schedule ? "(scheduled)" : "(unknown)");
 
     if (effectiveFmt === "markdown") {
       const summaries = rows.map((r) => ({
         "Post ID": r.postId ?? r.id ?? "",
-        State: r.state ?? r.status ?? "",
+        State: stateOf(r),
+        "Publish Method": r.publishMethod ?? "",
         URL: r.releaseURL ?? "",
       }));
-      return ["# Post Created", "", mdRecordTable(summaries)].join("\n") + "\n";
+      const parts = ["# Post Created", "", mdRecordTable(summaries)];
+      if (notices.length > 0) parts.push("", ...notices.map(n => `> ${n}`));
+      if (input.draft) parts.push("", "> Draft created. Commit it with `aisee post publish <id>`.");
+      return parts.join("\n") + "\n";
     }
 
     if (effectiveFmt !== "table") return results;
 
-    return rows.map(r => {
+    const blocks = rows.map(r => {
       const lines: string[] = [
         `postId   ${r.postId ?? r.id ?? ""}`,
-        `state    ${r.state ?? r.status ?? ""}`,
+        `state    ${stateOf(r)}`,
       ];
+      if (r.publishMethod) lines.push(`sendPath ${r.publishMethod}`);
       if (r.releaseURL) lines.push(`url      ${r.releaseURL}`);
       return lines.join("\n");
-    }).join("\n\n");
+    });
+    if (input.draft) blocks.push("Draft created. Commit it with: aisee post publish <id>");
+    blocks.push(...notices);
+    return blocks.join("\n\n");
   }
 };
 
@@ -74,6 +131,7 @@ function summarizePost(p: Record<string, unknown>, full: boolean): Record<string
   return {
     id: p.id,
     state: p.state ?? p.status,
+    send_path: p.publishMethod ?? "",
     platform: (p.integration as any)?.identifier ?? p.platform ?? p.channel,
     content: full || content.length <= 60 ? content : content.slice(0, 57) + "...",
     scheduled: p.publishDate ?? p.scheduled_at ?? p.scheduleDate,
@@ -348,15 +406,45 @@ function formatColTable(rows: Record<string, unknown>[]): string {
   return [header, sep, ...lines].join("\n");
 }
 
+// Whole-day windows: the backend widens startDate/endDate to startOf/endOf day
+// in the request timezone, so "24h" means today, not a rolling 24 hours.
+const PERIOD_DAYS: Record<string, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90 };
+
+function periodWindow(period: string): { startDate: string; endDate: string } {
+  const days = PERIOD_DAYS[period] ?? 7;
+  const end = new Date();
+  const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
+function validateChannels(raw: unknown): string[] | undefined {
+  const list = splitList(raw);
+  if (!list) return undefined;
+  const invalid = list.filter(c => !(VALID_CHANNELS as readonly string[]).includes(c));
+  if (invalid.length > 0) {
+    throw new UserError(
+      `Unknown channel(s): ${invalid.join(", ")}. Valid values: ${VALID_CHANNELS.join(", ")}`,
+    );
+  }
+  return list;
+}
+
 export const postDashboardModule = {
   description: "View social media engagement and traffic summary",
   inputSchema: z.object({
-    period: z.enum(["24h", "7d", "30d", "90d"]).default("7d").describe("Time range for metrics"),
-    channel: z.string().optional().describe("Filter metrics by platform name")
+    period: z.enum(["24h", "7d", "30d", "90d"]).default("7d").describe("Time range for metrics (whole days, in your timezone)"),
+    channel: z.string().optional().describe("Comma-separated platform names to filter by (e.g. x,reddit)"),
+    integration: z.string().optional().describe("Comma-separated integration IDs to filter by")
   }),
   outputSchema: z.any(),
   async execute(input: any) {
-    const data = await postAgentClient.getDashboard(input.period);
+    const { startDate, endDate } = periodWindow(input.period);
+    const data = await postAgentClient.getDashboard({
+      startDate,
+      endDate,
+      channel: validateChannels(input.channel),
+      integrationId: splitList(input.integration),
+    });
 
     const effectiveFmt = getFmt();
     if (effectiveFmt !== "table" && effectiveFmt !== "markdown") return data;
@@ -399,16 +487,70 @@ export const postDashboardModule = {
 };
 
 export const postPublishModule = {
-  description: "Publish a prepared post immediately",
+  description: "Commit a draft post to the send queue (or retry a failed one)",
   inputSchema: z.object({
-    id: z.string().describe("Internal ID of the post to publish")
+    id: z.string().describe("Internal ID of the post to commit"),
+    retry: z.boolean().default(false).describe("Retry a post in ERROR state instead of committing a draft"),
+    publish_method: z.enum(["extension", "api"]).optional().describe("Force the send path; omit to let the backend resolve it")
   }),
-  outputSchema: z.object({
-    status: z.string(),
-    published_at: z.string().optional()
-  }),
+  outputSchema: z.any(),
   async execute(input: any) {
-    return await postAgentClient.publishPost(input.id);
+    if (input.retry) {
+      // /posts/{id}/retry is ERROR-only and additionally requires a bound,
+      // enabled integration — an account-less extension post can never use it.
+      return await postAgentClient.retryPost(input.id);
+    }
+
+    const result = await postAgentClient.commitPosts([
+      { id: input.id, ...(input.publish_method ? { publishMethod: input.publish_method } : {}) },
+    ]);
+
+    const effectiveFmt = getFmt();
+    if (effectiveFmt !== "table" && effectiveFmt !== "markdown") return result;
+
+    const lines: string[] = [];
+    for (const ok of result.scheduled ?? []) {
+      lines.push(`✓ ${ok.id} queued${ok.publishMethod ? ` via ${ok.publishMethod}` : ""}`);
+      const notice = extensionNotice(ok.publishMethod);
+      if (notice) lines.push(`  ${notice}`);
+    }
+    for (const bad of result.failed ?? []) {
+      const hint = bad.code === "INVALID_STATE"
+        ? " — only DRAFT posts can be committed; use --retry for a failed post"
+        : "";
+      lines.push(`✗ ${bad.id} ${bad.code}: ${bad.message}${hint}`);
+    }
+    if (lines.length === 0) lines.push("(no posts affected)");
+
+    return effectiveFmt === "markdown"
+      ? ["# Post Publish", "", ...lines.map(l => `- ${l}`)].join("\n") + "\n"
+      : lines.join("\n");
+  }
+};
+
+export const postPendingModule = {
+  description: "Count posts queued for the browser extension to publish",
+  // Org-wide by design: GET /posts/publish-due/count takes no parameters, so
+  // there is no project-scoped variant to offer.
+  inputSchema: z.object({}),
+  outputSchema: z.any(),
+  async execute() {
+    const data = await postAgentClient.countPublishDue();
+    const effectiveFmt = getFmt();
+    if (effectiveFmt !== "table" && effectiveFmt !== "markdown") return data;
+
+    const record = (data ?? {}) as Record<string, unknown>;
+    const count = record.count ?? record.due ?? record.total ?? 0;
+    const body = [
+      `Posts waiting for the browser extension (organization-wide): ${count}`,
+      Number(count) > 0
+        ? "These publish from your signed-in Chrome, not from the server."
+        : "",
+    ].filter(Boolean);
+
+    return effectiveFmt === "markdown"
+      ? ["# Pending Extension Publishes", "", ...body].join("\n") + "\n"
+      : body.join("\n");
   }
 };
 

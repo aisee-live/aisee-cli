@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { analysisClient, type TaskTreeNode } from "../../clients/analysis.ts";
+import { analysisClient, type SuggestionResult, type TaskTreeNode } from "../../clients/analysis.ts";
 import { postAgentClient } from "../../clients/post-agent.ts";
 import { loadCredentials } from "../../utils/config.ts";
 import { productUrlSchema, normalizeProductUrl } from "../../utils/url.ts";
@@ -1489,26 +1489,60 @@ function formatActionDetailTable(action: Record<string, unknown>): string {
   return parts.join("\n").replace(/\n+$/, "") + "\n";
 }
 
+/**
+ * Render the non-`completed` terminal states.
+ *
+ * `unnecessary` and `unsupported` are successful pre-flight outcomes — the
+ * action is already at target, or has no playbook coverage. Nothing ran and
+ * nothing was charged, so they are reported, not thrown.
+ */
+function formatTerminalSuggestion(data: SuggestionResult, fmt: string): string | SuggestionResult {
+  const detail = data.message ?? data.reason ?? "";
+  const headline = data.status === "unnecessary"
+    ? "No action needed — this item is already at or above its target score."
+    : "No automated suggestion available — this gap has no playbook coverage yet; it needs manual review.";
+
+  if (fmt === "markdown") {
+    return [`# Suggestion — ${data.status}`, "", headline, ...(detail ? ["", detail] : [])].join("\n") + "\n";
+  }
+  if (fmt === "table" || fmt === "tui") {
+    return detail ? `${headline}\n\n${detail}` : headline;
+  }
+  return data;
+}
+
 export const actionsSuggestModule = {
   description: "Get detailed AI implementation suggestions",
   inputSchema: z.object({
     action_id: z.string().describe("Action task ID"),
+    content_days: z.number().int().min(0).optional().describe(
+      "Days of ready-to-publish social posts to generate (1 per day). 0 disables them. Default: server setting."
+    ),
   }),
   outputSchema: z.any(),
   async execute(input: any) {
     const fmt = getEffectiveFormat();
+    const options = input.content_days !== undefined ? { contentDays: input.content_days } : {};
+    const data = await analysisClient.getSuggestion(input.action_id, options);
+
+    if (data.status === "failed") {
+      const message = data.error?.message ?? data.message ?? "Suggestion generation failed";
+      const retryable = data.error?.terminal ? "" : " Re-run this command to try again.";
+      throw new UserError(`${message}.${retryable}`);
+    }
+
+    if (data.status === "unnecessary" || data.status === "unsupported") {
+      return formatTerminalSuggestion(data, fmt);
+    }
+
     if (fmt === "markdown") {
-      const data = await analysisClient.getSuggestion(input.action_id);
       return formatTaskResultMarkdown(data as Record<string, unknown>);
     }
     if (fmt === "table" || fmt === "tui") {
-      const [data, action] = await Promise.all([
-        analysisClient.getSuggestion(input.action_id),
-        analysisClient.getAction(input.action_id).catch(() => null),
-      ]);
+      const action = await analysisClient.getAction(input.action_id).catch(() => null);
       return formatSuggestTable(data as Record<string, unknown>, action as Record<string, unknown> | null);
     }
-    return analysisClient.getSuggestion(input.action_id);
+    return data;
   }
 };
 
@@ -1645,10 +1679,21 @@ export const actionsPostModule = {
       }
 
       for (const channel of matchingChannels) {
-        const result = await postAgentClient.createPost({
-          text: task.content || task.title || "",
-          channels: [channel.id],
-        });
+        let result;
+        try {
+          result = await postAgentClient.createPost({
+            text: task.content || task.title || "",
+            channels: [channel.id],
+          });
+        } catch (error) {
+          // A platform needing a value only the user can supply (subreddit,
+          // board, channel id) now fails loudly instead of posting an empty
+          // string. Skip that channel and keep going.
+          process.stderr.write(
+            `[skip] ${platform} (${channel.name}): ${(error as Error).message}\n`
+          );
+          continue;
+        }
         const postId = result[0]?.postId;
         if (postId != null && task.sn != null) {
           try {

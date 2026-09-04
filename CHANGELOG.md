@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-04
+
+### Added
+- New `aisee plan` command group for project planning capabilities.
+- Project-scoped posts and analytics filtering for better organization.
+
+### Changed
+- De-duplicated render helpers and expanded coverage to reconciliation path.
+
+### Fixed
+- Pending count calculation to reflect accurate state.
+- Corrected two silent scope widenings that were incorrectly expanding query ranges.
+- API alignment with current orchestrator and postiz contracts.
+- Partial batch failures now correctly exit with non-zero status across all output formats.
+
+## [0.6.1] - 2026-05-15
+
+### Changed
+- Enhanced CLI analysis UI with improved color-coding, layout, and responsive metadata display.
+
+### Fixed
+- Updated installation commands to specify @latest tag for npm and bun packages.
+
+## [0.6.0] - 2026-05-14
+
+### Added
+- `--client-id` support for the login command for improved credential management.
+
+### Changed
+- Simplified `config set` command syntax for better usability.
+
 ## [0.5.2] - 2026-05-13
 
 ### Added

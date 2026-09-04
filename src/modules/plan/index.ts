@@ -276,6 +276,17 @@ export const planPostsModule = {
     let planId = input.plan_id as string | undefined;
     if (!planId && !input.all_plans) {
       planId = (await postAgentClient.getActivePlanId(projectId)) ?? undefined;
+      if (!planId) {
+        // Falling through would list every plan's posts, which is not what was
+        // asked for — say so instead of quietly widening the scope.
+        const message =
+          `No active plan for '${input.project}'. ` +
+          `Pass --all-plans to list posts from every plan, or --plan-id <id> for a specific one.`;
+        const fmt = getOutputFormat();
+        if (fmt === "markdown") return `# Plan Posts\n\n${message}\n`;
+        if (isPresentationFormat(fmt)) return message;
+        return { results: [], total: 0, message };
+      }
     }
 
     const raw = await postAgentClient.listPosts({

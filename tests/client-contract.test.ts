@@ -1,11 +1,8 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { calls, callsFor, rejectWith, resetStub, setHandler } from "./support/api-stub.ts";
 
 /**
  * Contract tests for both API clients.
- *
- * They share one file because `mock.module` replaces a module globally for the
- * whole test run: a second file mocking `clients/http.ts` would not rebind the
- * client modules already imported against the first stub.
  *
  * What these pin:
  *   - `content_days=0` was sent unconditionally, telling the server to generate
@@ -17,55 +14,13 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
  *     invented a `state` the API never returned.
  */
 
-interface RecordedCall {
-  method: string;
-  url: string;
-  body?: unknown;
-  config?: { params?: Record<string, unknown>; data?: unknown };
-}
-
-const calls: RecordedCall[] = [];
-let handler: (call: RecordedCall) => unknown = () => ({});
-
-function verb(method: string) {
-  return (url: string, a?: unknown, b?: unknown) => {
-    // axios signatures differ: get(url, config) vs post(url, body, config)
-    const isBodyVerb = method === "post" || method === "put";
-    const call: RecordedCall = isBodyVerb
-      ? { method, url, body: a, config: b as RecordedCall["config"] }
-      : { method, url, config: a as RecordedCall["config"] };
-    calls.push(call);
-    return Promise.resolve({ data: handler(call) });
-  };
-}
-
-const axiosStub = {
-  get: verb("get"),
-  post: verb("post"),
-  put: verb("put"),
-  delete: verb("delete"),
-};
-
-mock.module("../src/clients/http.ts", () => ({
-  analysisAxios: axiosStub,
-  postAgentAxios: axiosStub,
-  authAxios: axiosStub,
-}));
-
 const { analysisClient } = await import("../src/clients/analysis.ts");
 const { postAgentClient } = await import("../src/clients/post-agent.ts");
 const { resolveProjectId, resolveOptionalProjectId, isProjectId } = await import("../src/utils/project.ts");
 
 const INTEGRATIONS = { integrations: [{ id: "ch_x", identifier: "x", name: "Brand X" }] };
 
-beforeEach(() => {
-  calls.length = 0;
-  handler = () => ({});
-});
-
-function only(method: string): RecordedCall[] {
-  return calls.filter((c) => c.method === method);
-}
+beforeEach(resetStub);
 
 // ---------------------------------------------------------------------------
 // analysis client
@@ -73,7 +28,7 @@ function only(method: string): RecordedCall[] {
 
 describe("analysisClient.getSuggestion", () => {
   it("should not send content_days when the caller does not ask for it", async () => {
-    handler = () => ({ status: "completed", tasks: [] });
+    setHandler(() => ({ status: "completed", tasks: [] }));
 
     await analysisClient.getSuggestion("action-1");
 
@@ -82,7 +37,7 @@ describe("analysisClient.getSuggestion", () => {
   });
 
   it("should send content_days when explicitly requested, including zero", async () => {
-    handler = () => ({ status: "completed", tasks: [] });
+    setHandler(() => ({ status: "completed", tasks: [] }));
 
     await analysisClient.getSuggestion("action-1", { contentDays: 0 });
     expect(calls[0]?.config?.params).toEqual({ content_days: 0 });
@@ -93,18 +48,18 @@ describe("analysisClient.getSuggestion", () => {
   });
 
   it("should return a completed dispatch without polling at all", async () => {
-    handler = () => ({ status: "completed", tasks: [{ sn: 1 }] });
+    setHandler(() => ({ status: "completed", tasks: [{ sn: 1 }] }));
 
     const result = await analysisClient.getSuggestion("action-1");
 
     expect(result.status).toBe("completed");
-    expect(only("get")).toHaveLength(0);
+    expect(callsFor("get")).toHaveLength(0);
   });
 
   it.each(["unnecessary", "unsupported"])(
     "should return the terminal %s state directly, without polling",
     async (status) => {
-      handler = () => ({ status, reason: "already at target" });
+      setHandler(() => ({ status, reason: "already at target" }));
 
       const result = await analysisClient.getSuggestion("action-1");
 
@@ -120,17 +75,17 @@ describe("analysisClient.pollGeneratedTasks", () => {
       { status: "processing", task_id: "task-9" },
       { status: "completed", tasks: [{ sn: 1 }] },
     ];
-    handler = () => queue.shift() ?? { status: "completed" };
+    setHandler(() => queue.shift() ?? { status: "completed" });
 
     const result = await analysisClient.pollGeneratedTasks("action-1", "test", 1, 5000);
 
     expect(result.status).toBe("completed");
-    expect(only("post")).toHaveLength(0);
+    expect(callsFor("post")).toHaveLength(0);
     expect(new Set(calls.map((c) => c.url))).toEqual(new Set(["/action/action-1/generated-tasks"]));
   });
 
   it("should stop on a failed status rather than looping to the timeout", async () => {
-    handler = () => ({ status: "failed", error: { message: "LLM returned garbage", terminal: true } });
+    setHandler(() => ({ status: "failed", error: { message: "LLM returned garbage", terminal: true } }));
 
     const result = await analysisClient.pollGeneratedTasks("action-1", "test", 1, 5000);
 
@@ -139,7 +94,7 @@ describe("analysisClient.pollGeneratedTasks", () => {
   });
 
   it("should time out with an actionable message when generation never settles", async () => {
-    handler = () => ({ status: "processing" });
+    setHandler(() => ({ status: "processing" }));
 
     await expect(analysisClient.pollGeneratedTasks("action-1", "test", 1, 30)).rejects.toThrow(
       /did not finish within/,
@@ -149,7 +104,7 @@ describe("analysisClient.pollGeneratedTasks", () => {
 
 describe("analysisClient.getReport", () => {
   it("should not send a section parameter the endpoint never accepted", async () => {
-    handler = () => ({ id: "task-1", result: {} });
+    setHandler(() => ({ id: "task-1", result: {} }));
 
     await analysisClient.getReport("https://example.com");
 
@@ -164,7 +119,7 @@ describe("analysisClient.getReport", () => {
 
 describe("postAgentClient.getDashboard", () => {
   it("should send a date window and never a period parameter", async () => {
-    handler = () => ({});
+    setHandler(() => ({}));
 
     await postAgentClient.getDashboard({ startDate: "2026-09-01T00:00:00.000Z", endDate: "2026-09-03T00:00:00.000Z" });
 
@@ -176,7 +131,7 @@ describe("postAgentClient.getDashboard", () => {
   });
 
   it("should join array filters into the comma form both DTOs accept", async () => {
-    handler = () => ({});
+    setHandler(() => ({}));
 
     await postAgentClient.getDashboard({ channel: ["x", "reddit"], integrationId: ["i1", "i2"] });
 
@@ -186,7 +141,7 @@ describe("postAgentClient.getDashboard", () => {
   });
 
   it("should omit empty filters entirely", async () => {
-    handler = () => ({});
+    setHandler(() => ({}));
 
     await postAgentClient.getDashboard({ channel: [] });
 
@@ -196,7 +151,7 @@ describe("postAgentClient.getDashboard", () => {
 
 describe("postAgentClient.createPost", () => {
   function handleCreate(response: unknown) {
-    handler = (call) => (call.url === "/integrations/list" ? INTEGRATIONS : response);
+    setHandler((call) => (call.url === "/integrations/list" ? INTEGRATIONS : response));
   }
 
   it("should send type=now when neither draft nor schedule is given", async () => {
@@ -257,7 +212,7 @@ describe("postAgentClient.createPost", () => {
 
 describe("postAgentClient.commitPosts", () => {
   it("should commit through /posts/schedule, not the retry route", async () => {
-    handler = () => ({ scheduled: [{ id: "p1", publishMethod: "extension" }], failed: [] });
+    setHandler(() => ({ scheduled: [{ id: "p1", publishMethod: "extension" }], failed: [] }));
 
     const result = await postAgentClient.commitPosts([{ id: "p1" }]);
 
@@ -267,7 +222,7 @@ describe("postAgentClient.commitPosts", () => {
   });
 
   it("should pass an explicit publishMethod through", async () => {
-    handler = () => ({ scheduled: [], failed: [] });
+    setHandler(() => ({ scheduled: [], failed: [] }));
 
     await postAgentClient.commitPosts([{ id: "p1", publishMethod: "api" }]);
 
@@ -275,10 +230,10 @@ describe("postAgentClient.commitPosts", () => {
   });
 
   it("should surface per-item failures instead of throwing", async () => {
-    handler = () => ({
+    setHandler(() => ({
       scheduled: [],
       failed: [{ id: "p1", code: "INVALID_STATE", message: "Cannot schedule a post in state ERROR" }],
-    });
+    }));
 
     const result = await postAgentClient.commitPosts([{ id: "p1" }]);
 
@@ -288,7 +243,7 @@ describe("postAgentClient.commitPosts", () => {
 
 describe("postAgentClient.retryPost", () => {
   it("should hit the retry route", async () => {
-    handler = () => ({ id: "p1" });
+    setHandler(() => ({ id: "p1" }));
 
     await postAgentClient.retryPost("p1");
 
@@ -302,7 +257,7 @@ describe("postAgentClient.retryPost", () => {
 
 describe("postAgentClient.listPosts", () => {
   it("should send array filters in the comma form the DTO transform splits", async () => {
-    handler = () => ({ results: [], total: 0 });
+    setHandler(() => ({ results: [], total: 0 }));
 
     await postAgentClient.listPosts({ channel: ["x", "reddit"], source: ["calendar", "engage"] });
 
@@ -312,7 +267,7 @@ describe("postAgentClient.listPosts", () => {
   });
 
   it("should drop empty and undefined filters rather than sending blanks", async () => {
-    handler = () => ({ results: [], total: 0 });
+    setHandler(() => ({ results: [], total: 0 }));
 
     await postAgentClient.listPosts({ state: "DRAFT", channel: [], projectId: undefined });
 
@@ -320,7 +275,7 @@ describe("postAgentClient.listPosts", () => {
   });
 
   it("should pass project and plan scoping through", async () => {
-    handler = () => ({ results: [], total: 0 });
+    setHandler(() => ({ results: [], total: 0 }));
 
     await postAgentClient.listPosts({ projectId: "prod-1", operationPlanId: "plan-1", sortBy: "createdAt" });
 
@@ -334,7 +289,7 @@ describe("postAgentClient.listPosts", () => {
 
 describe("postAgentClient.getDashboard project scope", () => {
   it("should send projectId when given", async () => {
-    handler = () => ({});
+    setHandler(() => ({}));
 
     await postAgentClient.getDashboard({ projectId: "prod-1" });
 
@@ -346,7 +301,7 @@ describe("postAgentClient.createPost — account-less platform targets", () => {
   it("should carry the platform in providerIdentifier with no integration", async () => {
     // Post.integrationId is nullable; such a post is published in-browser by
     // the extension, which resolves the platform from providerIdentifier.
-    handler = (call) => (call.url === "/integrations/list" ? INTEGRATIONS : [{ postId: "p1", integration: null }]);
+    setHandler((call) => (call.url === "/integrations/list" ? INTEGRATIONS : [{ postId: "p1", integration: null }]));
 
     await postAgentClient.createPost({ text: "Hello", platforms: ["hackernews"] });
 
@@ -358,7 +313,7 @@ describe("postAgentClient.createPost — account-less platform targets", () => {
   });
 
   it("should not look up integrations when there are no bound channels", async () => {
-    handler = () => [{ postId: "p1", integration: null }];
+    setHandler(() => [{ postId: "p1", integration: null }]);
 
     await postAgentClient.createPost({ text: "Hello", platforms: ["quora"] });
 
@@ -370,7 +325,7 @@ describe("postAgentClient.createPost — account-less platform targets", () => {
   });
 
   it("should send projectId when the caller resolved one", async () => {
-    handler = (call) => (call.url === "/integrations/list" ? INTEGRATIONS : [{ postId: "p1" }]);
+    setHandler((call) => (call.url === "/integrations/list" ? INTEGRATIONS : [{ postId: "p1" }]));
 
     await postAgentClient.createPost({ text: "Hello", channels: ["ch_x"], projectId: "prod-1" });
 
@@ -381,7 +336,7 @@ describe("postAgentClient.createPost — account-less platform targets", () => {
 
 describe("postAgentClient project bindings", () => {
   it("should list a project's bindings", async () => {
-    handler = () => ({ integrations: [{ id: "ch_x" }] });
+    setHandler(() => ({ integrations: [{ id: "ch_x" }] }));
 
     const rows = await postAgentClient.listProjectIntegrations("prod-1");
 
@@ -391,7 +346,7 @@ describe("postAgentClient project bindings", () => {
   });
 
   it("should bind with a JSON body", async () => {
-    handler = () => ({});
+    setHandler(() => ({}));
 
     await postAgentClient.bindIntegrationToProject("ch_x", "prod-1");
 
@@ -402,7 +357,7 @@ describe("postAgentClient project bindings", () => {
   it("should unbind with query params, not a body", async () => {
     // DELETE bodies are unreliable across proxies, so the route takes keys in
     // the query string.
-    handler = () => ({ success: true });
+    setHandler(() => ({ success: true }));
 
     await postAgentClient.unbindIntegrationFromProject("ch_x", "prod-1");
 
@@ -414,7 +369,7 @@ describe("postAgentClient project bindings", () => {
 
 describe("analysisClient.getAnalyzerModels", () => {
   it("should omit product_id when no product is given", async () => {
-    handler = () => ({ ai_presence_analyzer: [] });
+    setHandler(() => ({ ai_presence_analyzer: [] }));
 
     await analysisClient.getAnalyzerModels();
 
@@ -423,7 +378,7 @@ describe("analysisClient.getAnalyzerModels", () => {
   });
 
   it("should send product_id to also get the last run's models", async () => {
-    handler = () => ({ ai_presence_analyzer: [], latest_task: null });
+    setHandler(() => ({ ai_presence_analyzer: [], latest_task: null }));
 
     await analysisClient.getAnalyzerModels("example.com");
 
@@ -433,7 +388,7 @@ describe("analysisClient.getAnalyzerModels", () => {
 
 describe("analysisClient.scan model overrides", () => {
   it("should forward model_overrides to analyze-product", async () => {
-    handler = () => ({ task_id: "t1", status: "processing" });
+    setHandler(() => ({ task_id: "t1", status: "processing" }));
 
     await analysisClient.scan("https://example.com", {
       model_overrides: { ai_presence_analyzer: ["openai/gpt-5.2"] },
@@ -447,7 +402,7 @@ describe("analysisClient.scan model overrides", () => {
 // asking for it again would not see a request.
 describe("postAgentClient.getPublishMethods", () => {
   it("should fetch once and reuse the org-level answer", async () => {
-    handler = () => [{ platform: "x", extensionCapable: true, apiCapable: true, defaultMethod: "extension" }];
+    setHandler(() => [{ platform: "x", extensionCapable: true, apiCapable: true, defaultMethod: "extension" }]);
 
     const first = await postAgentClient.getPublishMethods();
     const second = await postAgentClient.getPublishMethods();
@@ -471,7 +426,7 @@ describe("resolveProjectId", () => {
   });
 
   it("should look a domain up through the product endpoint, which accepts either form", async () => {
-    handler = () => ({ id: "prod-uuid-1", url: "https://alpha.test" });
+    setHandler(() => ({ id: "prod-uuid-1", url: "https://alpha.test" }));
 
     const id = await resolveProjectId("https://alpha.test");
 
@@ -480,7 +435,7 @@ describe("resolveProjectId", () => {
   });
 
   it("should memoize a resolved product for the process", async () => {
-    handler = () => ({ id: "prod-uuid-2" });
+    setHandler(() => ({ id: "prod-uuid-2" }));
 
     await resolveProjectId("https://beta.test");
     const before = calls.length;
@@ -490,9 +445,18 @@ describe("resolveProjectId", () => {
   });
 
   it("should point at scan when the product does not exist yet", async () => {
-    handler = () => null;
+    // A missing product is a real 404, which arrives as a rejection — not an
+    // empty 200 body. Reading it as the latter left the advice unreachable and
+    // surfaced a bare "[404] Product not found".
+    setHandler(rejectWith(404, { success: false, error: "Product not found" }));
 
     await expect(resolveProjectId("https://missing.test")).rejects.toThrow(/aisee scan/);
+  });
+
+  it("should not swallow a non-404 failure as a missing product", async () => {
+    setHandler(rejectWith(500, { success: false, error: "boom" }));
+
+    await expect(resolveProjectId("https://broken.test")).rejects.toThrow(/boom/);
   });
 
   it("should send nothing when --project was not passed", async () => {
@@ -507,7 +471,7 @@ describe("resolveProjectId", () => {
 
 describe("postAgentClient.createOperationPlan", () => {
   it("should post the four required fields to the project-scoped route", async () => {
-    handler = () => ({ id: "plan-1", status: "GENERATING" });
+    setHandler(() => ({ id: "plan-1", status: "GENERATING" }));
 
     await postAgentClient.createOperationPlan("prod-1", {
       taskId: "task-1",
@@ -521,7 +485,7 @@ describe("postAgentClient.createOperationPlan", () => {
   });
 
   it("should not send a dryRun param on the real path", async () => {
-    handler = () => ({ id: "plan-1", status: "GENERATING" });
+    setHandler(() => ({ id: "plan-1", status: "GENERATING" }));
 
     await postAgentClient.createOperationPlan(
       "prod-1",
@@ -533,7 +497,7 @@ describe("postAgentClient.createOperationPlan", () => {
   });
 
   it("should send dryRun=true for a preview", async () => {
-    handler = () => ({ id: null, status: "PREVIEW", dryRun: true });
+    setHandler(() => ({ id: null, status: "PREVIEW", dryRun: true }));
 
     const plan = await postAgentClient.createOperationPlan(
       "prod-1",
@@ -555,7 +519,7 @@ describe("postAgentClient.pollOperationPlan", () => {
       { status: "BILLING_PENDING" },
       { status: "READY", plan: { id: "plan-1" } },
     ];
-    handler = () => queue.shift() ?? { status: "READY" };
+    setHandler(() => queue.shift() ?? { status: "READY" });
 
     const plan = await postAgentClient.pollOperationPlan("plan-1", undefined, 1, 5000);
 
@@ -566,7 +530,7 @@ describe("postAgentClient.pollOperationPlan", () => {
   it.each(["FAILED", "BILLING_FAILED"])(
     "should stop on the terminal %s status, which never recovers on its own",
     async (status) => {
-      handler = () => ({ status, errorCode: "GENERATION_FAILED", errorMessage: "boom" });
+      setHandler(() => ({ status, errorCode: "GENERATION_FAILED", errorMessage: "boom" }));
 
       const plan = await postAgentClient.pollOperationPlan("plan-1", undefined, 1, 5000);
 
@@ -576,7 +540,7 @@ describe("postAgentClient.pollOperationPlan", () => {
   );
 
   it("should time out pointing at plan status rather than hanging forever", async () => {
-    handler = () => ({ status: "GENERATING" });
+    setHandler(() => ({ status: "GENERATING" }));
 
     await expect(postAgentClient.pollOperationPlan("plan-1", undefined, 1, 30)).rejects.toThrow(
       /aisee plan status/,
@@ -587,14 +551,14 @@ describe("postAgentClient.pollOperationPlan", () => {
 describe("postAgentClient.getActivePlanId", () => {
   it("should return null when the project has no active plan", async () => {
     // The route answers { id: null } rather than 404 — a normal state.
-    handler = () => ({ id: null });
+    setHandler(() => ({ id: null }));
 
     expect(await postAgentClient.getActivePlanId("prod-1")).toBeNull();
     expect(calls[0]?.url).toBe("/projects/prod-1/operation-plans/active");
   });
 
   it("should return the id when there is one", async () => {
-    handler = () => ({ id: "plan-9" });
+    setHandler(() => ({ id: "plan-9" }));
 
     expect(await postAgentClient.getActivePlanId("prod-1")).toBe("plan-9");
   });
@@ -605,7 +569,7 @@ describe("postAgentClient.saveAutomationPublishing", () => {
     // `platforms` is the full enabled set, not a delta; a stored window
     // survives a save that does not mention it, so sending windows would risk
     // overwriting hours the CLI never asked about.
-    handler = () => ({ saved: true, scheduled: { scheduled: [], failed: [] } });
+    setHandler(() => ({ saved: true, scheduled: { scheduled: [], failed: [] } }));
 
     await postAgentClient.saveAutomationPublishing("prod-1", { platforms: ["x", "reddit"], commit: true });
 
@@ -615,7 +579,7 @@ describe("postAgentClient.saveAutomationPublishing", () => {
   });
 
   it("should pass an explicit publishMethod through for the committed batch", async () => {
-    handler = () => ({ saved: true, scheduled: null });
+    setHandler(() => ({ saved: true, scheduled: null }));
 
     await postAgentClient.saveAutomationPublishing("prod-1", {
       platforms: ["x"],
@@ -629,7 +593,7 @@ describe("postAgentClient.saveAutomationPublishing", () => {
 
 describe("analysisClient.getLatestTask", () => {
   it("should send the status filter and return the task", async () => {
-    handler = () => ({ id: "task-7", version_name: "3.0", status: "completed" });
+    setHandler(() => ({ id: "task-7", version_name: "3.0", status: "completed" }));
 
     const task = await analysisClient.getLatestTask("https://example.com", "completed");
 
@@ -640,7 +604,7 @@ describe("analysisClient.getLatestTask", () => {
 
   it("should return null for the endpoint's no-task answer instead of a truthy envelope", async () => {
     // It answers { success: false, message } rather than 404.
-    handler = () => ({ success: false, message: "No task found for this product" });
+    setHandler(() => ({ success: false, message: "No task found for this product" }));
 
     expect(await analysisClient.getLatestTask("https://example.com", "completed")).toBeNull();
   });

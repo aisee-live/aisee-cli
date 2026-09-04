@@ -677,9 +677,15 @@ export const postPublishModule = {
     }
     if (lines.length === 0) lines.push("(no posts affected)");
 
-    return effectiveFmt === "markdown"
+    const text = effectiveFmt === "markdown"
       ? ["# Post Publish", "", ...lines.map(l => `- ${l}`)].join("\n") + "\n"
       : lines.join("\n");
+
+    // A commit that failed must not exit 0 — same contract as `channels select`
+    // and `plan activate`. The report goes out with the error so the user still
+    // sees which posts did make it.
+    if ((result.failed ?? []).length > 0) throw new UserError(text);
+    return text;
   }
 };
 
@@ -694,18 +700,26 @@ export const postPendingModule = {
     const effectiveFmt = getFmt();
     if (effectiveFmt !== "table" && effectiveFmt !== "markdown") return data;
 
+    // The endpoint answers { dueNow, leased, scheduledAhead } — three distinct
+    // counts, not one total: work the extension should claim now, work it has
+    // already claimed and is publishing, and work scheduled for later.
     const record = (data ?? {}) as Record<string, unknown>;
-    const count = record.count ?? record.due ?? record.total ?? 0;
-    const body = [
-      `Posts waiting for the browser extension (organization-wide): ${count}`,
-      Number(count) > 0
-        ? "These publish from your signed-in Chrome, not from the server."
-        : "",
-    ].filter(Boolean);
+    const counts = {
+      due_now: Number(record.dueNow ?? 0),
+      leased: Number(record.leased ?? 0),
+      scheduled_ahead: Number(record.scheduledAhead ?? 0),
+    };
+    const waiting = counts.due_now + counts.leased;
+    const note = waiting > 0
+      ? "These publish from your signed-in Chrome, not from the server — that browser must be running."
+      : "";
 
-    return effectiveFmt === "markdown"
-      ? ["# Pending Extension Publishes", "", ...body].join("\n") + "\n"
-      : body.join("\n");
+    if (effectiveFmt === "markdown") {
+      const parts = ["# Pending Extension Publishes", "", mdKeyValueTable(counts)];
+      if (note) parts.push("", `> ${note}`);
+      return parts.join("\n") + "\n";
+    }
+    return note ? `${formatKV(counts)}\n\n${note}` : formatKV(counts);
   }
 };
 

@@ -1,4 +1,5 @@
 import { analysisClient } from "../clients/analysis.ts";
+import { ApiError } from "../clients/api-error.ts";
 import { UserError } from "./errors.ts";
 import { getDomain } from "./url.ts";
 
@@ -37,7 +38,15 @@ export async function resolveProjectId(reference: string): Promise<string> {
   const cached = resolved.get(lookup);
   if (cached) return cached;
 
-  const product = await analysisClient.getProduct(lookup) as { id?: string } | null;
+  // A missing product is a real 404 from the orchestrator, so it arrives as a
+  // rejection rather than an empty body — without this the advice below is
+  // unreachable and the user just sees "[404] Product not found".
+  const product = await analysisClient
+    .getProduct(lookup)
+    .catch((err: unknown) => {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }) as { id?: string } | null;
   const id = product?.id;
   if (!id) {
     throw new UserError(

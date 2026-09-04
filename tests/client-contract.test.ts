@@ -501,3 +501,147 @@ describe("resolveProjectId", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Phase 3 — operation plans and automation
+// ---------------------------------------------------------------------------
+
+describe("postAgentClient.createOperationPlan", () => {
+  it("should post the four required fields to the project-scoped route", async () => {
+    handler = () => ({ id: "plan-1", status: "GENERATING" });
+
+    await postAgentClient.createOperationPlan("prod-1", {
+      taskId: "task-1",
+      startAt: "2026-10-01T00:00:00.000Z",
+      endAt: "2026-10-07T00:00:00.000Z",
+      platforms: ["x"],
+    });
+
+    expect(calls[0]?.url).toBe("/projects/prod-1/operation-plans");
+    expect(calls[0]?.body).toMatchObject({ taskId: "task-1", platforms: ["x"] });
+  });
+
+  it("should not send a dryRun param on the real path", async () => {
+    handler = () => ({ id: "plan-1", status: "GENERATING" });
+
+    await postAgentClient.createOperationPlan(
+      "prod-1",
+      { taskId: "t", startAt: "a", endAt: "b", platforms: ["x"] },
+      false,
+    );
+
+    expect(calls[0]?.config?.params).toBeUndefined();
+  });
+
+  it("should send dryRun=true for a preview", async () => {
+    handler = () => ({ id: null, status: "PREVIEW", dryRun: true });
+
+    const plan = await postAgentClient.createOperationPlan(
+      "prod-1",
+      { taskId: "t", startAt: "a", endAt: "b", platforms: ["x"] },
+      true,
+    );
+
+    expect(calls[0]?.config?.params).toEqual({ dryRun: "true" });
+    // A preview is never persisted, so there is no id to poll.
+    expect(plan.id).toBeNull();
+    expect(plan.status).toBe("PREVIEW");
+  });
+});
+
+describe("postAgentClient.pollOperationPlan", () => {
+  it("should keep polling through the non-terminal statuses", async () => {
+    const queue = [
+      { status: "GENERATING" },
+      { status: "BILLING_PENDING" },
+      { status: "READY", plan: { id: "plan-1" } },
+    ];
+    handler = () => queue.shift() ?? { status: "READY" };
+
+    const plan = await postAgentClient.pollOperationPlan("plan-1", undefined, 1, 5000);
+
+    expect(plan.status).toBe("READY");
+    expect(calls).toHaveLength(3);
+  });
+
+  it.each(["FAILED", "BILLING_FAILED"])(
+    "should stop on the terminal %s status, which never recovers on its own",
+    async (status) => {
+      handler = () => ({ status, errorCode: "GENERATION_FAILED", errorMessage: "boom" });
+
+      const plan = await postAgentClient.pollOperationPlan("plan-1", undefined, 1, 5000);
+
+      expect(plan.status).toBe(status);
+      expect(calls).toHaveLength(1);
+    },
+  );
+
+  it("should time out pointing at plan status rather than hanging forever", async () => {
+    handler = () => ({ status: "GENERATING" });
+
+    await expect(postAgentClient.pollOperationPlan("plan-1", undefined, 1, 30)).rejects.toThrow(
+      /aisee plan status/,
+    );
+  });
+});
+
+describe("postAgentClient.getActivePlanId", () => {
+  it("should return null when the project has no active plan", async () => {
+    // The route answers { id: null } rather than 404 — a normal state.
+    handler = () => ({ id: null });
+
+    expect(await postAgentClient.getActivePlanId("prod-1")).toBeNull();
+    expect(calls[0]?.url).toBe("/projects/prod-1/operation-plans/active");
+  });
+
+  it("should return the id when there is one", async () => {
+    handler = () => ({ id: "plan-9" });
+
+    expect(await postAgentClient.getActivePlanId("prod-1")).toBe("plan-9");
+  });
+});
+
+describe("postAgentClient.saveAutomationPublishing", () => {
+  it("should send the complete platform set and never a windows map", async () => {
+    // `platforms` is the full enabled set, not a delta; a stored window
+    // survives a save that does not mention it, so sending windows would risk
+    // overwriting hours the CLI never asked about.
+    handler = () => ({ saved: true, scheduled: { scheduled: [], failed: [] } });
+
+    await postAgentClient.saveAutomationPublishing("prod-1", { platforms: ["x", "reddit"], commit: true });
+
+    expect(calls[0]?.url).toBe("/projects/prod-1/automation/publishing");
+    expect(calls[0]?.body).toEqual({ platforms: ["x", "reddit"], commit: true });
+    expect(calls[0]?.body).not.toHaveProperty("windows");
+  });
+
+  it("should pass an explicit publishMethod through for the committed batch", async () => {
+    handler = () => ({ saved: true, scheduled: null });
+
+    await postAgentClient.saveAutomationPublishing("prod-1", {
+      platforms: ["x"],
+      commit: true,
+      publishMethod: "extension",
+    });
+
+    expect(calls[0]?.body).toMatchObject({ publishMethod: "extension" });
+  });
+});
+
+describe("analysisClient.getLatestTask", () => {
+  it("should send the status filter and return the task", async () => {
+    handler = () => ({ id: "task-7", version_name: "3.0", status: "completed" });
+
+    const task = await analysisClient.getLatestTask("https://example.com", "completed");
+
+    expect(calls[0]?.url).toBe("/task/product-latest-tasks/example.com");
+    expect(calls[0]?.config?.params).toEqual({ status: "completed" });
+    expect(task?.id).toBe("task-7");
+  });
+
+  it("should return null for the endpoint's no-task answer instead of a truthy envelope", async () => {
+    // It answers { success: false, message } rather than 404.
+    handler = () => ({ success: false, message: "No task found for this product" });
+
+    expect(await analysisClient.getLatestTask("https://example.com", "completed")).toBeNull();
+  });
+});

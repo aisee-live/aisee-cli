@@ -1,6 +1,7 @@
 # AISee CLI — Backend API Alignment Plan
 
-**Status:** Approved — Phases 1-2 landed; Phase 3 pending
+**Status:** Approved — all three phases implemented
+**Implementation:** every work item landed; `bun test` 106 passing, `tsc --noEmit` clean, build OK. Shipped as 0.7.0 (Phase 3 folded into the same release rather than a separate 0.8.0).
 **Date:** 2026-09-03
 **CLI version:** 0.6.1
 
@@ -339,12 +340,15 @@ Phase 2; that contradiction is resolved here in favour of Phase 2.)*
 | 17 | `scan --model` + `aisee models` over `/task/analyzer-models` | `clients/analysis.ts`, `modules/analysis/index.ts` |
 | 18 | Re-sync OpenAPI; regenerate command docs | `docs/` |
 
-### Phase 3 — `0.8.0`, `aisee plan` command group
+### Phase 3 — `0.8.0`, `aisee plan` command group — IMPLEMENTED
 
 Every command reports per-platform `publishMethod` so the extension dependency is visible before
 the user commits credits.
 
-**`plan create --project <url> [--from-task <task-id>] --start <iso> --end <iso> --platforms <a,b> [--keywords <a,b>] [--dry-run]`**
+**`plan create --project <url> [--from-task <task-id>] --start <iso> --end <iso> --platforms <a,b> [--keywords <a,b>] [--preview]`**
+
+> Implementation note: `--dry-run` is a reserved apcore-cli option, so the preview flag shipped as
+> `--preview`.
 
 `POST /projects/{projectId}/operation-plans?dryRun=`. `CreateOperationPlanDto` requires **all four**
 of `taskId`, `startAt`, `endAt` (both `@IsISO8601({strict:true})`) and `platforms`

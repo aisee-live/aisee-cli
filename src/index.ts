@@ -28,6 +28,12 @@ import {
   channelRemoveModule,
   channelSelectModule,
 } from "./modules/post/index.ts";
+import {
+  planCreateModule,
+  planStatusModule,
+  planPostsModule,
+  planActivateModule,
+} from "./modules/plan/index.ts";
 import { configListModule, configSetModule, configSpecModule } from "./modules/config.ts";
 import { zodToJsonSchema } from "./utils/zod-to-schema.ts";
 import { ExecutorAdapter } from "./utils/executor-adapter.ts";
@@ -145,6 +151,10 @@ async function main() {
   registry.register("channels.add", channelAddModule);
   registry.register("channels.remove", channelRemoveModule);
   registry.register("channels.select", channelSelectModule);
+  registry.register("plan.create", planCreateModule);
+  registry.register("plan.status", planStatusModule);
+  registry.register("plan.posts", planPostsModule);
+  registry.register("plan.activate", planActivateModule);
   registry.register("config.list", configListModule);
   registry.register("config.set", configSetModule);
   registry.register("config.spec", configSpecModule);
@@ -238,6 +248,13 @@ async function main() {
     buildAiseeCommand(makeDescriptor("channels.select", channelSelectModule), executor, 1000, "select"),
     "url",
   ));
+
+  // plan — operation plans turn a completed analysis into scheduled content
+  const plan = program.command("plan").description("Operation plans");
+  plan.addCommand(buildAiseeCommand(makeDescriptor("plan.create", planCreateModule), executor, 1000, "create"));
+  plan.addCommand(buildAiseeCommand(makeDescriptor("plan.status", planStatusModule), executor, 1000, "status"));
+  plan.addCommand(buildAiseeCommand(makeDescriptor("plan.posts", planPostsModule), executor, 1000, "posts"));
+  plan.addCommand(buildAiseeCommand(makeDescriptor("plan.activate", planActivateModule), executor, 1000, "activate"));
 
   // config
   const conf = program.command("config").description("CLI configuration");

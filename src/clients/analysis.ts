@@ -224,6 +224,23 @@ export const analysisClient = {
     }
   },
 
+  /**
+   * Latest root task for a product, optionally narrowed by status.
+   *
+   * Returns null when the product has no matching task — the endpoint answers
+   * `{ success: false, message }` rather than 404 for that case.
+   */
+  async getLatestTask(productRef: string, status?: string): Promise<Record<string, unknown> | null> {
+    const productId = getDomain(productRef);
+    const response = await cx(analysisAxios.get(
+      `/task/product-latest-tasks/${encodeURIComponent(productId)}`,
+      { params: status ? { status } : undefined },
+    ));
+    const data = response.data as Record<string, unknown> | null;
+    if (!data || data.success === false || !data.id) return null;
+    return data;
+  },
+
   async getActions(url: string, options: { module?: string; has_solution?: boolean; page?: number; size?: number; status?: string } = {}) {
     const productId = getDomain(url);
     const response = await cx(analysisAxios.get(`/action`, {

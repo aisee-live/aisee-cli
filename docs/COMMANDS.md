@@ -298,6 +298,99 @@ aisee post schedule abc-123 2026-05-01T10:00:00Z
 
 ---
 
+## Operation Plans
+
+An operation plan turns a completed analysis into a date-ranged publishing schedule. Generated posts
+land in `DRAFT`; committing them to the send queue is a separate, explicit step.
+
+### `aisee plan create`
+Generate a plan from a completed analysis. Generation is asynchronous — the command polls until the
+plan settles.
+
+```bash
+aisee plan create --project https://example.com --start 2026-10-01T09:00:00Z --end 2026-10-14T09:00:00Z --platforms x,reddit
+aisee plan create --project https://example.com --start ... --end ... --platforms x --preview
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--project <ref>` | required | Product URL, domain or ID |
+| `--from-task <id>` | *latest completed analysis* | Analysis task to build the plan from |
+| `--start <iso>` | required | Plan start (ISO 8601, must be in the future) |
+| `--end <iso>` | required | Plan end (must be after `--start`) |
+| `--platforms <a,b>` | required | Platforms to plan for |
+| `--keywords <a,b>` | *from the product snapshot* | Engage keywords for the plan's reply policies |
+| `--preview` | false | Generate a preview without billing or persisting anything |
+
+`--from-task` has no server-side default — the API requires a task ID — so when it is omitted the
+CLI resolves the product's latest **completed** analysis and prints which one it picked.
+
+`--preview` runs generation inline and returns a plan with `status: PREVIEW` and no ID. Nothing is
+persisted and no credit is deducted, so there is nothing to poll: the command prints the preview and
+exits. (The LLM call still runs, at real cost to the platform.)
+
+Without `--preview` the plan settles on `READY`, `FAILED` or `BILLING_FAILED`. The two failure
+states are terminal — nothing retries them — so the command reports the reason and exits non-zero.
+
+The output lists the resolved send path per platform, so a plan that depends on the browser
+extension is visible before you commit credits.
+
+### `aisee plan status`
+Show the project's active plan and its posts.
+
+```bash
+aisee plan status --project https://example.com
+aisee plan status --project https://example.com --plan-id <id>
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--project <ref>` | required | Product URL, domain or ID |
+| `--plan-id <id>` | *the active plan* | Inspect a specific plan instead |
+
+Having no active plan is a normal state, not an error — the command says so and exits cleanly.
+
+### `aisee plan posts`
+List the posts a plan generated.
+
+```bash
+aisee plan posts --project https://example.com
+aisee plan posts --project https://example.com --all-plans --state DRAFT
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--project <ref>` | required | Product URL, domain or ID |
+| `--plan-id <id>` | *the active plan* | Only posts from this plan |
+| `--all-plans` | false | Every plan-generated post for the project |
+| `--state <s>` | — | `DRAFT`, `QUEUE`, `PUBLISHED`, `ERROR` |
+| `--page <n>` / `--size <n>` | 1 / 20 | Pagination |
+
+### `aisee plan activate`
+Commit the project's active plan to the send queue (`DRAFT` → `QUEUE`).
+
+```bash
+aisee plan activate --project https://example.com
+aisee plan activate --project https://example.com --platforms x,reddit
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--project <ref>` | required | Product URL, domain or ID |
+| `--platforms <a,b>` | *the project's current set* | **Complete** set of platforms to publish to |
+| `--publish-method <m>` | — | Force `extension` or `api` for this batch |
+
+> **`--platforms` replaces, it does not add.** The API treats this field as the complete enabled set:
+> any platform left out is switched **off**, and an empty set switches scheduled publishing off
+> entirely. When you omit the flag the CLI reads the project's current set and sends it back
+> unchanged, and when you pass one it names any platform that is about to be turned off. If the
+> project has no platforms enabled yet, the command refuses rather than writing an empty set.
+
+The plan itself is never named by the client — the API resolves the project's active plan
+server-side, so a stale or wrong plan ID cannot be sent.
+
+---
+
 ## Channels
 
 ### `aisee channels list`

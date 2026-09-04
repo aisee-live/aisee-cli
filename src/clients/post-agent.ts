@@ -282,6 +282,34 @@ export interface PublishMethodInfo {
   reason?: string;
 }
 
+/** Statuses an operation plan can settle on; the sweepers never revive these. */
+export const TERMINAL_PLAN_STATUSES = ["READY", "FAILED", "BILLING_FAILED"] as const;
+
+export interface OperationPlanOverview {
+  status: string;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  plan?: Record<string, unknown>;
+  posts?: Array<Record<string, unknown>>;
+  engageStats?: unknown;
+  /** Present only on the dry-run preview, which is never persisted. */
+  dryRun?: boolean;
+  id?: string | null;
+  estimatedUsage?: unknown;
+  [k: string]: unknown;
+}
+
+export interface AutomationOverview {
+  projectId?: string;
+  enabled?: boolean;
+  publishing?: {
+    enabled?: boolean;
+    timezone?: string;
+    platforms?: Record<string, { enabled?: boolean; window?: unknown }>;
+  };
+  [k: string]: unknown;
+}
+
 let publishMethodsCache: PublishMethodInfo[] | null = null;
 
 export const postAgentClient = {
@@ -407,6 +435,95 @@ export const postAgentClient = {
   async countPublishDue() {
     const response = await cx(postAgentAxios.get(`/posts/publish-due/count`));
     return response.data;
+  },
+
+  // --- Operation plans -----------------------------------------------------
+
+  /**
+   * Create (or return) the operation plan for one completed analysis task.
+   *
+   * `taskId` is the idempotency key: a repeat with the same parameters returns
+   * the existing plan without regenerating or charging again.
+   *
+   * With `dryRun` the whole generation runs INLINE and the result is never
+   * persisted — it comes back with `status: "PREVIEW"` and `id: null`, so there
+   * is nothing to poll. Without it the call returns a `GENERATING` stub
+   * immediately and the caller must poll `getOperationPlan`.
+   */
+  async createOperationPlan(
+    projectId: string,
+    body: { taskId: string; startAt: string; endAt: string; platforms: string[]; keywords?: string[] },
+    dryRun = false,
+  ): Promise<OperationPlanOverview> {
+    const response = await cx(
+      postAgentAxios.post(`/projects/${projectId}/operation-plans`, body, {
+        params: dryRun ? { dryRun: "true" } : undefined,
+      }),
+    );
+    return response.data as OperationPlanOverview;
+  },
+
+  async getOperationPlan(planId: string): Promise<OperationPlanOverview> {
+    const response = await cx(postAgentAxios.get(`/operation-plans/${planId}`));
+    return response.data as OperationPlanOverview;
+  },
+
+  /**
+   * The project's active plan id, or `{ id: null }` when it has none —
+   * "no active plan" is a normal state for a project, not a 404.
+   */
+  async getActivePlanId(projectId: string): Promise<string | null> {
+    const response = await cx(postAgentAxios.get(`/projects/${projectId}/operation-plans/active`));
+    return (response.data?.id ?? null) as string | null;
+  },
+
+  /** Poll a freshly created plan until it settles. */
+  async pollOperationPlan(
+    planId: string,
+    onTick?: (status: string) => void,
+    intervalMs = 5000,
+    timeoutMs = 900000,
+  ): Promise<OperationPlanOverview> {
+    const terminal = new Set<string>(TERMINAL_PLAN_STATUSES);
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const plan = await postAgentClient.getOperationPlan(planId);
+      if (onTick) onTick(plan.status);
+      if (terminal.has(plan.status)) return plan;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new UserError(
+      `Operation plan ${planId} did not settle within ${Math.round(timeoutMs / 60000)} minutes. ` +
+      `Generation continues in the background — run 'aisee plan status' to check on it.`,
+    );
+  },
+
+  // --- Automation ----------------------------------------------------------
+
+  async getAutomation(projectId: string): Promise<AutomationOverview> {
+    const response = await cx(postAgentAxios.get(`/projects/${projectId}/automation`));
+    return response.data as AutomationOverview;
+  },
+
+  /**
+   * Save scheduled-publishing settings and optionally commit the active plan.
+   *
+   * `platforms` is the COMPLETE enabled set, never a delta — a platform left
+   * out is turned off. `windows` is deliberately not sent: a stored window
+   * survives a save that does not mention it.
+   */
+  async saveAutomationPublishing(
+    projectId: string,
+    body: { platforms: string[]; commit?: boolean; publishMethod?: PublishMethod; enabled?: boolean },
+  ) {
+    const response = await cx(postAgentAxios.post(`/projects/${projectId}/automation/publishing`, body));
+    return response.data as {
+      saved?: boolean;
+      scheduled?: ScheduleResult | null;
+      rescheduled?: unknown;
+    };
   },
 
   async uploadMedia(filePath: string): Promise<MediaObject> {

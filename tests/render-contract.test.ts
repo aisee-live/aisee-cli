@@ -19,6 +19,25 @@ const INTEGRATIONS = { integrations: [{ id: "ch_x", identifier: "x", name: "Bran
 
 beforeEach(resetStub);
 
+/** Run something expected to fail and hand back the error for inspection. */
+async function failure(fn: () => Promise<unknown>): Promise<{ message: string; details: Record<string, unknown> }> {
+  try {
+    await fn();
+  } catch (err) {
+    const e = err as { message: string; details?: Record<string, unknown> };
+    return { message: e.message, details: e.details ?? {} };
+  }
+  throw new Error("expected the call to fail, but it resolved");
+}
+
+/** The detail lines describing individual failures, joined for matching. */
+function reasons(details: Record<string, unknown>): string {
+  return Object.entries(details)
+    .filter(([k]) => k.startsWith("post ") || k.startsWith("failure "))
+    .map(([, v]) => String(v))
+    .join(" | ");
+}
+
 describe("post pending", () => {
   it("should report the three counts the endpoint actually returns", async () => {
     setHandler(() => ({ dueNow: 3, leased: 1, scheduledAhead: 7 }));
@@ -144,9 +163,26 @@ describe("post publish", () => {
       failed: [{ id: "p1", code: "INVALID_STATE", message: "Cannot schedule a post in state ERROR" }],
     }));
 
-    await expect(
-      withFormat("table", () => postPublishModule.execute({ id: "p1", retry: false })),
-    ).rejects.toThrow(/--retry/);
+    const err = await failure(() =>
+      withFormat("table", () => postPublishModule.execute({ id: "p1", retry: false })));
+
+    expect(err.message).toMatch(/could not be committed/);
+    expect(reasons(err.details)).toMatch(/--retry/);
+  });
+
+  it("should fail the same way for a machine format, not exit 0 with the failure in stdout", async () => {
+    // The exit code must not depend on --format. The per-item breakdown rides
+    // on `details`, which both error emitters forward.
+    setHandler(() => ({
+      scheduled: [{ id: "p2", publishMethod: "api" }],
+      failed: [{ id: "p1", code: "NOT_FOUND", message: "Post not found" }],
+    }));
+
+    const err = await failure(() =>
+      withFormat("json", () => postPublishModule.execute({ id: "p1", retry: false })));
+
+    expect(err.details.queued).toBe("p2");
+    expect(err.details["post p1"]).toBe("NOT_FOUND: Post not found");
   });
 
   it("should use the ERROR-only retry route when asked", async () => {
@@ -221,6 +257,28 @@ describe("plan activate", () => {
     expect((save?.body as any).platforms.sort()).toEqual(["reddit", "x"]);
     expect((save?.body as any).commit).toBe(true);
     expect(save?.body).not.toHaveProperty("windows");
+  });
+
+  it("should fail in every format when part of the batch could not be queued", async () => {
+    setHandler((call) => {
+      if (call.url.startsWith("/product/")) return { id: "prod-partial" };
+      if (call.url.endsWith("/automation")) return { publishing: { platforms: { x: { enabled: true } } } };
+      return {
+        saved: true,
+        scheduled: {
+          scheduled: [{ id: "p2", publishMethod: "extension" }],
+          failed: [{ id: "p1", code: "INVALID_STATE", message: "Cannot schedule a post in state ERROR" }],
+        },
+      };
+    });
+
+    const err = await failure(() =>
+      withFormat("json", () => planActivateModule.execute({ project: "https://partialplan.test" })));
+
+    expect(err.message).toMatch(/could not be queued/);
+    expect(err.details.queued).toBe("p2");
+    expect(err.details["post p1"]).toMatch(/INVALID_STATE/);
+    expect(err.details.platforms).toBe("x");
   });
 
   it("should name the platforms an explicit set is about to switch off", async () => {
@@ -303,20 +361,20 @@ describe("channels select — reconciliation", () => {
     // could drop a binding the user never asked to remove.
     setHandler(routes({ [LIST_BOUND]: boom(500, "upstream down") }));
 
-    await expect(
-      withFormat("json", () => channelSelectModule.execute({ url: "https://unreadable.test", channels: "ch_x" })),
-    ).rejects.toThrow(/could not read existing bindings/);
+    const err = await failure(() =>
+      withFormat("json", () => channelSelectModule.execute({ url: "https://unreadable.test", channels: "ch_x" })));
 
+    expect(reasons(err.details)).toMatch(/could not read existing bindings/);
     expect(callsFor("delete")).toHaveLength(0);
   });
 
   it("should still write the core list when a bind fails, and report the failure", async () => {
     setHandler(routes({ [BIND]: boom(409, "already bound elsewhere") }));
 
-    await expect(
-      withFormat("json", () => channelSelectModule.execute({ url: "https://partial.test", channels: "ch_x" })),
-    ).rejects.toThrow(/already bound elsewhere/);
+    const err = await failure(() =>
+      withFormat("json", () => channelSelectModule.execute({ url: "https://partial.test", channels: "ch_x" })));
 
+    expect(reasons(err.details)).toMatch(/already bound elsewhere/);
     // The read succeeded, so this really is a bind-only failure.
     expect(calls.some((c) => c.url === LIST_BOUND)).toBe(true);
     expect(calls.some((c) => c.method === "post" && c.url === BIND)).toBe(true);
@@ -332,10 +390,11 @@ describe("channels select — reconciliation", () => {
       return base(call);
     });
 
-    await expect(
-      withFormat("json", () => channelSelectModule.execute({ url: "https://unbindfail.test", channels: "ch_x" })),
-    ).rejects.toThrow(/unbind refused/);
+    const err = await failure(() =>
+      withFormat("json", () => channelSelectModule.execute({ url: "https://unbindfail.test", channels: "ch_x" })));
 
+    expect(reasons(err.details)).toMatch(/unbind refused/);
+    expect(err.details.bound).toBe("ch_x");
     expect(calls.some((c) => c.url.startsWith("/product/config"))).toBe(true);
   });
 

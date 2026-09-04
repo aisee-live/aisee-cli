@@ -520,3 +520,38 @@ Use `--fields` to select specific fields:
 ```bash
 aisee report https://example.com --format json --fields result.total_score,status
 ```
+
+> **Defaults differ between command groups.** `post` commands render a table on a
+> TTY and JSON when piped; every other command renders TUI on a TTY and a table
+> when piped. Pass `--format` explicitly in scripts rather than relying on either.
+
+## Failures
+
+Some commands act on several items at once — `post publish`, `plan activate` and
+`channels select` each touch a batch, and part of a batch can fail while the rest
+succeeds.
+
+When that happens the command **exits non-zero regardless of `--format`**, and the
+per-item breakdown is reported as structured `details` on stderr rather than mixed
+into the successful output on stdout:
+
+```
+Error: 1 of 2 post(s) could not be committed.
+
+  Details:
+    queued: p2
+    post p1: INVALID_STATE: Cannot schedule a post in state ERROR — only DRAFT posts can be committed; use --retry for a failed post
+
+  Exit code: 1
+```
+
+The same breakdown in a machine format:
+
+```json
+{"error":true,"code":"UNKNOWN","message":"1 of 2 post(s) could not be committed.","exit_code":1,
+ "details":{"queued":"p2","post p1":"INVALID_STATE: Cannot schedule a post in state ERROR — ..."}}
+```
+
+`details` is always a flat map of scalar values, so it reads the same in both.
+A script should check the exit code and read `details` from stderr; stdout carries
+output only when the whole batch succeeded.

@@ -344,43 +344,43 @@ export const channelSelectModule = {
     const projectId = await resolveProjectId(input.url as string);
     const outcome = await reconcileChannelBindings(productId, projectId, matched);
 
+    if (outcome.failures.length > 0) {
+      throw new UserError(
+        `Channel binding for '${productId}' finished with ${outcome.failures.length} failure(s).`,
+        {
+          details: {
+            bound: outcome.bound.length > 0 ? outcome.bound.join(", ") : "(none)",
+            unbound: outcome.unbound.length > 0 ? outcome.unbound.join(", ") : "(none)",
+            ...Object.fromEntries(outcome.failures.map((f, i) => [`failure ${i + 1}`, f])),
+          },
+        },
+      );
+    }
+
     if (effectiveFmt === "markdown") {
       const rows = matched.map((ch: any) => ({
         ID: ch.id,
         Platform: ch.identifier ?? ch.type ?? "",
         Name: ch.display ?? ch.name ?? "",
       }));
-      const parts = [
+      return [
         "# Channels Configured", "", `Product: \`${productId}\``, "",
         mdRecordTable(rows), "",
         "## Sync", "", ...outcome.log.map((l) => `- ${l}`),
-      ];
-      const text = parts.join("\n") + "\n";
-      if (outcome.failures.length > 0) throw new UserError(text);
-      return text;
+      ].join("\n") + "\n";
     }
 
     if (effectiveFmt === "table") {
-      const text = [
-        `Configured ${matched.length} channel(s) for '${productId}'.`,
-        ...outcome.log,
-      ].join("\n");
-      if (outcome.failures.length > 0) throw new UserError(text);
-      return text;
+      return [`Configured ${matched.length} channel(s) for '${productId}'.`, ...outcome.log].join("\n");
     }
 
-    const result = {
+    return {
       product_id: productId,
       project_id: projectId,
       channels: matched.map((ch: any) => ch.id),
       bound: outcome.bound,
       unbound: outcome.unbound,
-      failures: outcome.failures,
     };
-    if (outcome.failures.length > 0) {
-      throw new UserError(JSON.stringify(result));
-    }
-    return result;
   },
 };
 
@@ -620,32 +620,44 @@ export const postPublishModule = {
       { id: input.id, ...(input.publish_method ? { publishMethod: input.publish_method } : {}) },
     ]);
 
+    const scheduled = result.scheduled ?? [];
+    const failed = result.failed ?? [];
+
+    // A commit that failed exits non-zero in EVERY format. The per-item
+    // breakdown rides on `details`, which both error emitters forward, so a
+    // JSON consumer still gets the reasons — on stderr, alongside the exit
+    // code — instead of a success exit with a failure buried in stdout.
+    if (failed.length > 0) {
+      throw new UserError(
+        `${failed.length} of ${scheduled.length + failed.length} post(s) could not be committed.`,
+        {
+          details: {
+            queued: scheduled.length > 0 ? scheduled.map((p) => p.id).join(", ") : "(none)",
+            ...Object.fromEntries(failed.map((f) => [
+              `post ${f.id}`,
+              f.code === "INVALID_STATE"
+                ? `${f.code}: ${f.message} — only DRAFT posts can be committed; use --retry for a failed post`
+                : `${f.code}: ${f.message}`,
+            ])),
+          },
+        },
+      );
+    }
+
     const effectiveFmt = getFmt();
     if (effectiveFmt !== "table" && effectiveFmt !== "markdown") return result;
 
     const lines: string[] = [];
-    for (const ok of result.scheduled ?? []) {
+    for (const ok of scheduled) {
       lines.push(`✓ ${ok.id} queued${ok.publishMethod ? ` via ${ok.publishMethod}` : ""}`);
       const notice = extensionNotice(ok.publishMethod);
       if (notice) lines.push(`  ${notice}`);
     }
-    for (const bad of result.failed ?? []) {
-      const hint = bad.code === "INVALID_STATE"
-        ? " — only DRAFT posts can be committed; use --retry for a failed post"
-        : "";
-      lines.push(`✗ ${bad.id} ${bad.code}: ${bad.message}${hint}`);
-    }
     if (lines.length === 0) lines.push("(no posts affected)");
 
-    const text = effectiveFmt === "markdown"
+    return effectiveFmt === "markdown"
       ? ["# Post Publish", "", ...lines.map(l => `- ${l}`)].join("\n") + "\n"
       : lines.join("\n");
-
-    // A commit that failed must not exit 0 — same contract as `channels select`
-    // and `plan activate`. The report goes out with the error so the user still
-    // sees which posts did make it.
-    if ((result.failed ?? []).length > 0) throw new UserError(text);
-    return text;
   }
 };
 

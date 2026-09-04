@@ -337,6 +337,22 @@ export const planActivateModule = {
     const scheduled = result.scheduled?.scheduled ?? [];
     const failed = result.scheduled?.failed ?? [];
 
+    // Same contract as `post publish` and `channels select`: a partial failure
+    // exits non-zero in every format, with the breakdown on `details`.
+    if (failed.length > 0) {
+      throw new UserError(
+        `${failed.length} of ${scheduled.length + failed.length} post(s) could not be queued for '${input.project}'.`,
+        {
+          details: {
+            platforms: platforms.join(", "),
+            ...(disabled.length > 0 ? { switched_off: disabled.join(", ") } : {}),
+            queued: scheduled.length > 0 ? scheduled.map((p) => p.id).join(", ") : "(none)",
+            ...Object.fromEntries(failed.map((f) => [`post ${f.id}`, `${f.code}: ${f.message}`])),
+          },
+        },
+      );
+    }
+
     const fmt = getOutputFormat();
     if (!isPresentationFormat(fmt)) {
       return { projectId, platforms, disabled, ...result };
@@ -352,20 +368,14 @@ export const planActivateModule = {
     for (const ok of scheduled) {
       lines.push(`✓ ${ok.id} queued${ok.publishMethod ? ` via ${ok.publishMethod}` : ""}`);
     }
-    for (const bad of failed) {
-      lines.push(`✗ ${bad.id} ${bad.code}: ${bad.message}`);
-    }
     if (scheduled.some((p) => p.publishMethod === "extension")) {
       lines.push(
         "Posts queued via 'extension' publish from your signed-in Chrome, not from the server.",
       );
     }
 
-    const text = fmt === "markdown"
+    return fmt === "markdown"
       ? ["# Plan Activated", "", ...lines.map((l) => `- ${l}`)].join("\n") + "\n"
       : lines.join("\n");
-
-    if (failed.length > 0) throw new UserError(text);
-    return text;
   },
 };

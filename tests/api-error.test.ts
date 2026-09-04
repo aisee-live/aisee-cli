@@ -15,7 +15,7 @@ describe("toApiError", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(err.message).toBe("[403] Product example.com is deactivated");
     expect(err.code).toBe(ApiErrorCode.PRODUCT_INACTIVE);
-    expect(err.isProductInactive()).toBe(true);
+    expect(err.status).toBe(403);
   });
 
   it("should keep the reason rather than the code when an orchestrator 402 carries both", () => {
@@ -24,7 +24,7 @@ describe("toApiError", () => {
     );
 
     expect(err.message).toBe("[402] Balance 3 is below the required 50");
-    expect(err.isInsufficientCredit()).toBe(true);
+    expect(err.status).toBe(402);
   });
 
   it("should fall back to `detail` when an orchestrator envelope has no `error` text", () => {
@@ -68,12 +68,12 @@ describe("toApiError", () => {
     expect(err.message).toBe("[422] body.startAt: invalid datetime format");
   });
 
-  it("should flag a 429 as a concurrency limit", () => {
+  it("should keep the status on a 429 so callers can tell it apart", () => {
     const err = toApiError(
       axiosError(429, { success: false, error: "existing task is processing", detail: "Too many requests" }),
     );
 
-    expect(err.isConcurrencyLimit()).toBe(true);
+    expect(err.status).toBe(429);
   });
 
   it("should degrade gracefully when there is no response body", () => {

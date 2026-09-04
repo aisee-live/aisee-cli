@@ -19,6 +19,7 @@ import {
   getTerminalWidth,
 } from "./tui.ts";
 import { getOutputFormat } from "./format.ts";
+import { escapeMdCell } from "./table.ts";
 
 function rethrowUserError(err: unknown): never {
   if (err instanceof UserError) {
@@ -38,10 +39,6 @@ function rethrowUserError(err: unknown): never {
     process.exit(1);
   }
   throw err;
-}
-
-function escapeMdCell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 }
 
 function renderObjectMarkdown(obj: Record<string, unknown>): string {

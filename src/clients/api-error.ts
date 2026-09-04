@@ -3,15 +3,14 @@ import { UserError } from "../utils/errors.ts";
 /**
  * Backend error codes the CLI reacts to by name rather than by message text.
  *
- * `PRODUCT_INACTIVE` is the orchestrator's `detail` for a deactivated product;
- * the credit and concurrency codes are the `detail` strings the action-dispatch
- * handler attaches to 402 / 429 so a client can render a CTA without sniffing
- * prose. See aisee_orchestrator/api/action_routes.py.
+ * Only `PRODUCT_INACTIVE` needs one: it is the orchestrator's `detail` for a
+ * deactivated product, and no status code distinguishes it from any other 403.
+ * Insufficient credit and the concurrency limit are identified by their status
+ * (402 / 429) instead, so their `detail` strings are not matched on.
+ * See aisee_orchestrator/api/action_routes.py.
  */
 export const ApiErrorCode = {
   PRODUCT_INACTIVE: "PRODUCT_INACTIVE",
-  INSUFFICIENT_CREDIT: "Insufficient credit",
-  CONCURRENCY_LIMIT: "Too many requests, existing task is processing",
 } as const;
 
 /**
@@ -59,19 +58,6 @@ export class ApiError extends UserError {
     const advice = adviseFor(options.status, options.code);
     this.suggestion = advice.suggestion;
     this.retryable = advice.retryable;
-  }
-
-  /** True when the backend refused because the product is switched off. */
-  isProductInactive(): boolean {
-    return this.code === ApiErrorCode.PRODUCT_INACTIVE;
-  }
-
-  isInsufficientCredit(): boolean {
-    return this.status === 402;
-  }
-
-  isConcurrencyLimit(): boolean {
-    return this.status === 429;
   }
 }
 

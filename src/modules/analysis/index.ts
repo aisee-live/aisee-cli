@@ -8,6 +8,7 @@ import { UserError } from "../../utils/errors.ts";
 import { isDebug } from "../../utils/log-level.ts";
 import { getOutputFormat, isPresentationFormat } from "../../utils/format.ts";
 import { renderMarkdownToTui, colors as tuiColors, visibleLength, getTerminalWidth } from "../../utils/tui.ts";
+import { formatColumnTable, mdKeyValueTable, mdRecordTable } from "../../utils/table.ts";
 
 function dbg(msg: string, data?: unknown): void {
   if (!isDebug()) return;
@@ -85,43 +86,6 @@ function formatKeyValueTable(obj: Record<string, unknown>): string {
   const header = "Key".padEnd(keyWidth) + "  Value";
   const rows = entries.map(([k, v]) => k.padEnd(keyWidth) + "  " + String(v ?? ""));
   return [header, sep, ...rows].join("\n");
-}
-
-function escapeMdCell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
-}
-
-function formatColumnTable(rows: Record<string, unknown>[]): string {
-  if (rows.length === 0) return "(none)";
-  const keys = Object.keys(rows[0]!);
-  const widths = keys.map(k => Math.max(k.length, ...rows.map(r => String(r[k] ?? "").length)));
-  const sep = widths.map(w => "-".repeat(w)).join("  ");
-  const header = keys.map((k, i) => k.padEnd(widths[i]!)).join("  ");
-  const lines = rows.map(r => keys.map((k, i) => String(r[k] ?? "").padEnd(widths[i]!)).join("  "));
-  return [header, sep, ...lines].join("\n");
-}
-
-function mdKeyValueTable(obj: Record<string, unknown>): string {
-  const entries = Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "");
-  if (entries.length === 0) return "";
-  const lines = ["| Field | Value |", "|-------|-------|"];
-  for (const [k, v] of entries) {
-    lines.push(`| ${escapeMdCell(String(k))} | ${escapeMdCell(String(v))} |`);
-  }
-  return lines.join("\n");
-}
-
-function mdRecordTable(records: Record<string, unknown>[]): string {
-  if (records.length === 0) return "_No records._";
-  const keys = [...new Set(records.flatMap((r) => Object.keys(r)))];
-  const lines = [
-    "| " + keys.map((k) => escapeMdCell(k)).join(" | ") + " |",
-    "| " + keys.map(() => "---").join(" | ") + " |",
-  ];
-  for (const r of records) {
-    lines.push("| " + keys.map((k) => escapeMdCell(String(r[k] ?? ""))).join(" | ") + " |");
-  }
-  return lines.join("\n");
 }
 
 function mdBulletList(items: string[]): string {

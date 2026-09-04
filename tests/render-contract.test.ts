@@ -11,7 +11,7 @@ import { calls, callsFor, resetStub, setHandler, withFormat } from "./support/ap
  * of the response was not.
  */
 
-const { postCreateModule, postPublishModule, postPendingModule, postDashboardModule } =
+const { postCreateModule, postPublishModule, postPendingModule, postDashboardModule, channelSelectModule } =
   await import("../src/modules/post/index.ts");
 const { planPostsModule, planActivateModule } = await import("../src/modules/plan/index.ts");
 
@@ -237,5 +237,135 @@ describe("plan activate", () => {
 
     expect(out).toContain("switched OFF");
     expect(out).toContain("reddit");
+  });
+});
+
+/**
+ * `channels select` is the only command that DELETES user data — it unbinds
+ * channels in Postiz to match what the user passed. It also spans two stores
+ * that can disagree, so every branch here is about not losing a binding by
+ * accident.
+ */
+describe("channels select — reconciliation", () => {
+  const CHANNELS = {
+    integrations: [
+      { id: "ch_x", identifier: "x", name: "Brand X", display: "Brand X" },
+      { id: "ch_rd", identifier: "reddit", name: "Brand RD", display: "Brand RD" },
+    ],
+  };
+
+  const BIND = "/integrations/integration-project";
+  const LIST_BOUND = "/integrations/integration-project/list";
+
+  function boom(status: number, message: string) {
+    return () => {
+      throw Object.assign(new Error(message), { response: { status, data: { message } } });
+    };
+  }
+
+  /**
+   * Exact-URL routing on purpose: `/integrations/integration-project` is a
+   * prefix of `/integrations/integration-project/list`, so substring matching
+   * silently makes a "bind fails" case fail the read as well.
+   */
+  function routes(overrides: Record<string, () => unknown> = {}) {
+    return (call: { url: string; method: string }) => {
+      const override = overrides[call.url];
+      if (override) return override();
+      if (call.url === "/integrations/list") return CHANNELS;
+      if (call.url === LIST_BOUND) return { integrations: [] };
+      if (call.url.startsWith("/product/config")) return { ok: true };
+      if (call.url.startsWith("/product/")) return { id: "prod-1" };
+      return {};
+    };
+  }
+
+  it("should bind the additions, unbind the removals, and write the core list", async () => {
+    setHandler(routes({ [LIST_BOUND]: () => ({ integrations: [{ id: "ch_rd" }] }) }));
+
+    await withFormat("json", () =>
+      channelSelectModule.execute({ url: "https://recon.test", channels: "ch_x" }));
+
+    const bind = calls.find((c) => c.method === "post" && c.url === BIND);
+    expect(bind?.body).toEqual({ integrationId: "ch_x", projectId: "prod-1" });
+
+    // ch_rd was bound but is not in the new set, so it must be removed — an
+    // upsert-only sync would leave it bound and still counted on the dashboard.
+    const unbind = calls.find((c) => c.method === "delete");
+    expect(unbind?.config?.params).toEqual({ integrationId: "ch_rd", projectId: "prod-1" });
+
+    const core = calls.find((c) => c.url.startsWith("/product/config"));
+    expect(core?.config?.params).toEqual({ product_id: "recon.test" });
+  });
+
+  it("should not unbind anything when the current bindings cannot be read", async () => {
+    // Without the current set a safe diff is impossible; deleting on a guess
+    // could drop a binding the user never asked to remove.
+    setHandler(routes({ [LIST_BOUND]: boom(500, "upstream down") }));
+
+    await expect(
+      withFormat("json", () => channelSelectModule.execute({ url: "https://unreadable.test", channels: "ch_x" })),
+    ).rejects.toThrow(/could not read existing bindings/);
+
+    expect(callsFor("delete")).toHaveLength(0);
+  });
+
+  it("should still write the core list when a bind fails, and report the failure", async () => {
+    setHandler(routes({ [BIND]: boom(409, "already bound elsewhere") }));
+
+    await expect(
+      withFormat("json", () => channelSelectModule.execute({ url: "https://partial.test", channels: "ch_x" })),
+    ).rejects.toThrow(/already bound elsewhere/);
+
+    // The read succeeded, so this really is a bind-only failure.
+    expect(calls.some((c) => c.url === LIST_BOUND)).toBe(true);
+    expect(calls.some((c) => c.method === "post" && c.url === BIND)).toBe(true);
+    // A failed Postiz binding must not silently skip the aisee-core write.
+    expect(calls.some((c) => c.url.startsWith("/product/config"))).toBe(true);
+  });
+
+  it("should report an unbind failure without losing the rest of the run", async () => {
+    // Wrap the router so only the DELETE fails.
+    const base = routes({ [LIST_BOUND]: () => ({ integrations: [{ id: "ch_rd" }] }) });
+    setHandler((call) => {
+      if (call.method === "delete") return boom(500, "unbind refused")();
+      return base(call);
+    });
+
+    await expect(
+      withFormat("json", () => channelSelectModule.execute({ url: "https://unbindfail.test", channels: "ch_x" })),
+    ).rejects.toThrow(/unbind refused/);
+
+    expect(calls.some((c) => c.url.startsWith("/product/config"))).toBe(true);
+  });
+
+  it("should refuse an unknown channel id before writing anything", async () => {
+    setHandler(routes());
+
+    await expect(
+      withFormat("json", () => channelSelectModule.execute({ url: "https://unknown.test", channels: "ch_nope" })),
+    ).rejects.toThrow(/Channel\(s\) not found: ch_nope/);
+
+    expect(callsFor("post")).toHaveLength(0);
+    expect(callsFor("delete")).toHaveLength(0);
+  });
+
+  it("should show both stores and flag a binding that exists in only one", async () => {
+    setHandler((call) => {
+      if (call.url === LIST_BOUND) return { integrations: [{ id: "ch_rd", providerIdentifier: "reddit" }] };
+      if (call.url.startsWith("/product/")) {
+        return { id: "prod-drift", config: { channels: [{ id: "ch_x", identifier: "x", display: "Brand X" }] } };
+      }
+      return {};
+    });
+
+    const out = await withFormat("table", () =>
+      channelSelectModule.execute({ url: "https://drift.test" })) as string;
+
+    expect(out).toContain("in_core");
+    expect(out).toContain("in_postiz");
+    expect(out).toContain("ch_x");
+    expect(out).toContain("ch_rd");
+    expect(out).toContain("bound on only one side");
   });
 });

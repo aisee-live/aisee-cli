@@ -9,39 +9,8 @@ import {
 import { UserError } from "../../utils/errors.ts";
 import { getOutputFormat, isPresentationFormat } from "../../utils/format.ts";
 import { resolveProjectId } from "../../utils/project.ts";
-
-function splitList(value: unknown): string[] | undefined {
-  if (typeof value !== "string") return undefined;
-  const parts = value.split(",").map((v) => v.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : undefined;
-}
-
-function escapeMdCell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
-}
-
-function mdRecordTable(records: Record<string, unknown>[]): string {
-  if (records.length === 0) return "_None._";
-  const keys = [...new Set(records.flatMap((r) => Object.keys(r)))];
-  const lines = [
-    "| " + keys.map(escapeMdCell).join(" | ") + " |",
-    "| " + keys.map(() => "---").join(" | ") + " |",
-  ];
-  for (const r of records) {
-    lines.push("| " + keys.map((k) => escapeMdCell(String(r[k] ?? ""))).join(" | ") + " |");
-  }
-  return lines.join("\n");
-}
-
-function formatColumnTable(rows: Record<string, unknown>[]): string {
-  if (rows.length === 0) return "(none)";
-  const keys = Object.keys(rows[0]!);
-  const widths = keys.map((k) => Math.max(k.length, ...rows.map((r) => String(r[k] ?? "").length)));
-  const sep = widths.map((w) => "-".repeat(w)).join("  ");
-  const header = keys.map((k, i) => k.padEnd(widths[i]!)).join("  ");
-  const lines = rows.map((r) => keys.map((k, i) => String(r[k] ?? "").padEnd(widths[i]!)).join("  "));
-  return [header, sep, ...lines].join("\n");
-}
+import { formatColumnTable, mdRecordTable } from "../../utils/table.ts";
+import { splitList } from "../../utils/args.ts";
 
 function formatKV(obj: Record<string, unknown>): string {
   const entries = Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "");
@@ -159,8 +128,9 @@ export const planCreateModule = {
       ...(splitList(input.keywords) ? { keywords: splitList(input.keywords)! } : {}),
     };
 
+    // `taskNote` is carried into the rendered output below, so it must not
+    // also go to stderr — on a TTY that printed the resolved task twice.
     const isTTY = process.stderr.isTTY;
-    if (taskNote && isTTY) process.stderr.write(`${taskNote}\n`);
 
     const created = await postAgentClient.createOperationPlan(projectId, body, input.preview === true);
 

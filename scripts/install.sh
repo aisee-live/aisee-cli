@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 # AISee CLI installer — macOS and Linux
-# Usage: sh scripts/install.sh [--prefix /usr/local]
+# Usage: sh scripts/install.sh [--prefix ~/.local]
 set -e
 
-PREFIX="/usr/local"
+PREFIX="$HOME/.local"
 if [ "$1" = "--prefix" ] && [ -n "$2" ]; then
   PREFIX="$2"
 fi
@@ -55,9 +55,11 @@ if [ ! -f "$BINARY" ]; then
 fi
 
 # ── Install ───────────────────────────────────────────────────────────────────
+BIN_DIR="$(dirname "$DEST")"
+mkdir -p "$BIN_DIR" 2>/dev/null || true
 INSTALL_CMD="install -m 755 $BINARY $DEST"
 
-if [ -w "$(dirname "$DEST")" ]; then
+if [ -w "$BIN_DIR" ]; then
   $INSTALL_CMD
 else
   echo "Installing to $DEST (requires sudo)..."
@@ -66,3 +68,9 @@ fi
 
 echo "Installed: $DEST"
 "$DEST" --version
+
+case ":$PATH:" in
+  *":$BIN_DIR:"*) ;;
+  *) echo "Note: $BIN_DIR is not on your PATH. Add this to your shell profile:"
+     echo "  export PATH=\"$BIN_DIR:\$PATH\"" ;;
+esac

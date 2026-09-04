@@ -42,6 +42,17 @@ curl -L https://github.com/aisee-live/aisee-cli/releases/latest/download/aisee -
 chmod +x /usr/local/bin/aisee
 ```
 
+### macOS/Linux — from source
+
+```bash
+git clone <repository-url>
+cd aisee-cli
+bun install
+
+sh scripts/install.sh                       # builds (if needed) and installs to ~/.local/bin, no sudo needed
+sh scripts/install.sh --prefix /usr/local   # or a system-wide prefix
+```
+
 ### Windows — from source
 
 ```powershell

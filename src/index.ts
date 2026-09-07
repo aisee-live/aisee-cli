@@ -47,6 +47,15 @@ interface AiseeModule {
 }
 
 /**
+ * Commander stores option values under the camelCase name derived from the
+ * flag (`--action-id` → `actionId`), never under the schema's snake_case
+ * field name. Any lookup keyed by the raw field name silently misses.
+ */
+function toCommanderKey(optName: string): string {
+  return optName.replace(/[-_]([a-z0-9])/g, (_, c) => c.toUpperCase());
+}
+
+/**
  * Map positional args to named options before the action fires.
  * Follows GNU convention: primary subject is positional, flags stay as --options.
  * Supports both `cmd <val>` and `cmd --opt <val>` transparently.
@@ -58,16 +67,17 @@ interface AiseeModule {
 function withPositionals(cmd: Command, ...optionNames: string[]): Command {
   cmd.hook("preAction", (thisCmd) => {
     optionNames.forEach((optName, i) => {
+      const commanderKey = toCommanderKey(optName);
       const val = (thisCmd.args as string[])[i];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const source = (thisCmd as any).getOptionValueSource?.(optName);
-      if (val && (!thisCmd.getOptionValue(optName) || source === "default" || source === undefined)) {
-        thisCmd.setOptionValue(optName, val);
+      const source = (thisCmd as any).getOptionValueSource?.(commanderKey);
+      if (val && (!thisCmd.getOptionValue(commanderKey) || source === "default" || source === undefined)) {
+        thisCmd.setOptionValue(commanderKey, val);
       }
     });
 
     for (const optName of optionNames) {
-      if (thisCmd.getOptionValue(optName) == null) {
+      if (thisCmd.getOptionValue(toCommanderKey(optName)) == null) {
         if (process.stderr.isTTY) {
           process.stderr.write(`error: missing required argument <${optName}>\n\n`);
           process.stderr.write(thisCmd.helpInformation());

@@ -312,6 +312,18 @@ export interface AutomationOverview {
 
 let publishMethodsCache: PublishMethodInfo[] | null = null;
 
+/**
+ * Drop the org-level publish-methods cache.
+ *
+ * Exists for tests: the cache is module-level and outlives a single test file,
+ * so whichever test fetched first decides what every later one sees — a stub
+ * set up afterwards is simply never consulted, and the failure reads as a
+ * feature bug rather than a leaked fixture.
+ */
+export function resetPublishMethodsCache(): void {
+  publishMethodsCache = null;
+}
+
 export const postAgentClient = {
   // Posts
   async createPost(data: {

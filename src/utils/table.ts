@@ -37,10 +37,17 @@ export function mdKeyValueTable(obj: Record<string, unknown>): string {
   return lines.join("\n");
 }
 
-/** A plain-text column table, sized to its widest cell per column. */
+/**
+ * A plain-text column table, sized to its widest cell per column.
+ *
+ * Columns are the union of every row's keys, matching `mdRecordTable`. Reading
+ * them off the first row alone dropped whole columns when a field is
+ * conditional — `channels list` omits `browser_session` on server-published
+ * channels, so one such channel sorted first hid the field for every row below.
+ */
 export function formatColumnTable(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return "(none)";
-  const keys = Object.keys(rows[0]!);
+  const keys = [...new Set(rows.flatMap((r) => Object.keys(r)))];
   const widths = keys.map((k) => Math.max(k.length, ...rows.map((r) => String(r[k] ?? "").length)));
   const sep = widths.map((w) => "-".repeat(w)).join("  ");
   const header = keys.map((k, i) => k.padEnd(widths[i]!)).join("  ");

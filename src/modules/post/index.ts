@@ -10,14 +10,15 @@ import { formatColumnTable, mdKeyValueTable, mdRecordTable } from "../../utils/t
 import { splitList } from "../../utils/args.ts";
 import { resolveFormat } from "../../utils/format.ts";
 
-const EXTENSION_SEND_PATH_NOTE =
-  "Channels with send path 'extension' publish from your signed-in Chrome via the AISee browser " +
-  "extension, not from the server. For those, read 'extension_session' — not 'connected' — to see " +
+const BROWSER_SESSION_NOTE =
+  "Channels that carry a 'browser_session' publish from your signed-in Chrome via the AISee browser " +
+  "extension, not from the server. For those, read 'browser_session' — not 'connected' — to see " +
   "whether a post can go out right now: 'connected' only reflects the server-side OAuth credential " +
-  "the 'api' send path uses, and says nothing about the browser session.";
+  "the server-published channels use, and says nothing about the browser session.";
 
 /**
- * What the extension last reported about this channel's platform.
+ * What the extension last reported about the browser session on this
+ * channel's platform.
  *
  * `matched`      — the browser is signed into THIS account; posts can go out.
  * `not_matched`  — the platform was checked and the browser is signed into a
@@ -28,12 +29,12 @@ const EXTENSION_SEND_PATH_NOTE =
  * `unknown`      — never reported. An extension too old to report, or one that
  *                  has not run its hourly pass here yet.
  */
-type ExtensionSessionStatus = "matched" | "not_matched" | "stale" | "unknown";
+type BrowserSessionStatus = "matched" | "not_matched" | "stale" | "unknown";
 
 /** Platforms whose sign-in probe is unreliable enough to soften the verdict. */
 const LOW_CONFIDENCE_PROBE_PLATFORMS = new Set(["quora", "devto"]);
 
-const EXTENSION_SESSION_CONFIDENCE_NOTE =
+const BROWSER_SESSION_CONFIDENCE_NOTE =
   "On quora and devto the sign-in probe is less reliable than elsewhere (both serve signed-out " +
   "visitors the same cookies), so 'not_matched' there is worth re-checking by hand before " +
   "treating the account as unusable.";
@@ -43,11 +44,11 @@ const EXTENSION_SESSION_CONFIDENCE_NOTE =
  * timestamp carries the distinction the two-value `activeSessionClient` cannot:
  * never reported is not the same answer as reported and currently API.
  */
-function deriveExtensionSessionStatus(ch: {
+function deriveBrowserSessionStatus(ch: {
   activeSessionClient?: string | null;
   extensionSessionCheckedAt?: string | null;
   extensionSessionStale?: boolean;
-}): ExtensionSessionStatus {
+}): BrowserSessionStatus {
   if (!ch.extensionSessionCheckedAt) return "unknown";
   if (ch.extensionSessionStale) return "stale";
   return ch.activeSessionClient === "EXTENSION" ? "matched" : "not_matched";
@@ -267,20 +268,23 @@ export const channelListModule = {
     const integrations: any[] = data?.integrations ?? [];
     const channels = integrations.map((ch) => {
       const platform = (ch.identifier ?? ch.type ?? "") as string;
+      // The send path is org-level config keyed by platform, so every channel on
+      // a platform repeats the same value — a constant column that told the
+      // reader nothing. It stays local as the gate below, and the presence of
+      // the browser fields is what now marks a browser-published channel.
       const sendPath = sendPathByPlatform.get(platform) ?? "";
       return {
         id: ch.id as string,
         platform,
         name: (ch.display ?? ch.name ?? "") as string,
         connected: !ch.disabled && !ch.refreshNeeded,
-        send_path: sendPath,
-        // Only meaningful for the extension path — on 'api' channels the
-        // browser session has no bearing on whether a post goes out, so
+        // Only meaningful for the extension path — on server-published channels
+        // the browser session has no bearing on whether a post goes out, so
         // reporting a status there would invite reading it as one more thing
         // that must be green.
         ...(sendPath === "extension"
           ? {
-              extension_session: deriveExtensionSessionStatus(ch),
+              browser_session: deriveBrowserSessionStatus(ch),
               ...(ch.extensionSessionHandle
                 ? { browser_signed_in_as: ch.extensionSessionHandle as string }
                 : {}),
@@ -290,15 +294,15 @@ export const channelListModule = {
     });
 
     const effectiveFmt = getFmt();
-    const extensionChannels = channels.filter((c) => c.send_path === "extension");
-    const usesExtension = extensionChannels.length > 0;
-    const hasLowConfidenceMiss = extensionChannels.some(
+    const browserChannels = channels.filter((c) => c.browser_session !== undefined);
+    const usesBrowser = browserChannels.length > 0;
+    const hasLowConfidenceMiss = browserChannels.some(
       (c) =>
-        c.extension_session === "not_matched" &&
+        c.browser_session === "not_matched" &&
         LOW_CONFIDENCE_PROBE_PLATFORMS.has(c.platform)
     );
-    const notes = usesExtension
-      ? [EXTENSION_SEND_PATH_NOTE, ...(hasLowConfidenceMiss ? [EXTENSION_SESSION_CONFIDENCE_NOTE] : [])]
+    const notes = usesBrowser
+      ? [BROWSER_SESSION_NOTE, ...(hasLowConfidenceMiss ? [BROWSER_SESSION_CONFIDENCE_NOTE] : [])]
       : [];
 
     if (effectiveFmt === "markdown") {
@@ -307,8 +311,7 @@ export const channelListModule = {
         Platform: c.platform,
         Name: c.name,
         Connected: c.connected ? "Yes" : "No",
-        "Send Path": c.send_path,
-        "Extension Session": c.extension_session ?? "",
+        "Browser Session": c.browser_session ?? "",
       }));
       const parts = ["# Channels", "", mdRecordTable(rows)];
       for (const note of notes) parts.push("", `> ${note}`);

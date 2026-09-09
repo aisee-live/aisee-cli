@@ -115,6 +115,40 @@ function withVerbose(cmd: Command): Command {
   return cmd.option("--verbose", "Show detailed output or return raw API response");
 }
 
+/** Every command carries these; the root command itself accepts none of them. */
+const COMMON_OPTION_LINES = [
+  "  --format <format>   Output format: tui, table, markdown, json, csv, yaml, jsonl",
+  "  --fields <paths>    Comma-separated dot-paths to select from the result",
+];
+
+const EXTRA_COMMON_OPTION_LINES = [
+  "  --input <source>    Read JSON input from a file path, or '-' to read from stdin",
+  "  -y, --yes           Skip interactive approval prompts (for scripts and CI)",
+  "  --dry-run           Run preflight checks without executing the command",
+  "  --trace             Show execution pipeline trace with per-step timing",
+  "  --stream            Stream output as JSONL (one JSON object per line)",
+];
+
+/**
+ * apcore-cli attaches the built-in options (--format, --fields, ...) to each
+ * subcommand, so the root help never mentions them on its own. Restate them
+ * here: --format is the flag scripts reach for first, and leaving it behind
+ * `--all-options` means discovering it requires already knowing to ask.
+ */
+function withCommonOptionsHelp(program: Command, showAll: boolean): Command {
+  const lines = showAll
+    ? [...COMMON_OPTION_LINES, ...EXTRA_COMMON_OPTION_LINES]
+    : COMMON_OPTION_LINES;
+  return program.addHelpText("after", [
+    "",
+    "Common options (available on every command):",
+    ...lines,
+    "",
+    "Example: aisee whoami --format json",
+    "",
+  ].join("\n"));
+}
+
 function makeDescriptor(moduleId: string, mod: AiseeModule): ModuleDescriptor {
   return {
     id: moduleId,
@@ -173,6 +207,12 @@ async function main() {
   const executor = new ExecutorAdapter(app.executor);
   const registryAdapter = new RegistryAdapter(registry);
 
+  // apcore-cli latches `--all-options` into module state inside createCli; every
+  // buildModuleCommand call afterwards reads that state to decide whether the
+  // built-in options (--format, --fields, --dry-run, ...) show up in help.
+  // Commander stops parsing at `--help`, so read the raw argv instead of opts().
+  const showAllOptions = process.argv.includes("--all-options");
+
   // createCli bootstraps: audit logger, approval handler, canonical help formatter,
   // and the hidden apcli group (list/describe/exec/etc.) for power users.
   const program = createCli({
@@ -180,9 +220,12 @@ async function main() {
     executor,
     progName: "aisee",
     apcli: false,
+    allOptions: showAllOptions,
     version: pkg.version,
     description: "AISee CLI — AI-powered visibility analysis and content optimization",
   });
+
+  withCommonOptionsHelp(program, showAllOptions);
 
   program.hook("preAction", () => {
     const level = program.opts().logLevel as string | undefined;

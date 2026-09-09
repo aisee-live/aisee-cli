@@ -5,11 +5,12 @@ import { resetStub, setHandler, withFormat } from "./support/api-stub.ts";
  * `channels list` has to answer one question honestly: can this channel publish
  * right now?
  *
- * For 'extension' channels `connected` cannot answer it — that field tracks the
- * OAuth credential the 'api' send path uses, and an integration whose token is
- * stale publishes through the browser perfectly well. That mismatch is what
- * made a `connected: false` channel look unusable while it was in fact posting,
- * so these tests pin the field that does answer it.
+ * For browser-published channels `connected` cannot answer it — that field
+ * tracks the OAuth credential the server-published path uses, and an
+ * integration whose token is stale publishes through the browser perfectly
+ * well. That mismatch is what made a `connected: false` channel look unusable
+ * while it was in fact posting, so these tests pin the field that does answer
+ * it: `browser_session`.
  */
 
 const { channelListModule } = await import("../src/modules/post/index.ts");
@@ -45,11 +46,11 @@ function channel(overrides: Record<string, unknown> = {}): Record<string, unknow
 beforeEach(() => {
   resetStub();
   // Module-level and shared across test files: without this, whichever file
-  // fetched publish-methods first decides what send_path this module sees.
+  // fetched publish-methods first decides which send path this module sees.
   resetPublishMethodsCache();
 });
 
-describe("channels list — extension session status", () => {
+describe("channels list — browser session status", () => {
   it("should report matched when the browser is signed into this account", async () => {
     stubChannels([
       channel({
@@ -59,7 +60,7 @@ describe("channels list — extension session status", () => {
       }),
     ]);
     const rows = (await withFormat("json", () => channelListModule.execute())) as any[];
-    expect(rows[0].extension_session).toBe("matched");
+    expect(rows[0].browser_session).toBe("matched");
   });
 
   it("should report not_matched when the platform was checked but another account is signed in", async () => {
@@ -72,14 +73,14 @@ describe("channels list — extension session status", () => {
       }),
     ]);
     const rows = (await withFormat("json", () => channelListModule.execute())) as any[];
-    expect(rows[0].extension_session).toBe("not_matched");
+    expect(rows[0].browser_session).toBe("not_matched");
     expect(rows[0].browser_signed_in_as).toBe("aiperceivable");
   });
 
   it("should report unknown when the extension has never reported for this channel", async () => {
     stubChannels([channel({ activeSessionClient: "API", extensionSessionCheckedAt: null })]);
     const rows = (await withFormat("json", () => channelListModule.execute())) as any[];
-    expect(rows[0].extension_session).toBe("unknown");
+    expect(rows[0].browser_session).toBe("unknown");
   });
 
   it("should report stale rather than matched when the last report has aged out", async () => {
@@ -91,7 +92,7 @@ describe("channels list — extension session status", () => {
       }),
     ]);
     const rows = (await withFormat("json", () => channelListModule.execute())) as any[];
-    expect(rows[0].extension_session).toBe("stale");
+    expect(rows[0].browser_session).toBe("stale");
   });
 
   it("should leave the status off api-routed channels, where a browser session is irrelevant", async () => {
@@ -104,8 +105,8 @@ describe("channels list — extension session status", () => {
       }),
     ]);
     const rows = (await withFormat("json", () => channelListModule.execute())) as any[];
-    expect(rows[0].send_path).toBe("api");
-    expect(rows[0]).not.toHaveProperty("extension_session");
+    expect(rows[0]).not.toHaveProperty("browser_session");
+    expect(rows[0]).not.toHaveProperty("browser_signed_in_as");
   });
 
   it("should keep connected independent of the session status", async () => {
@@ -120,15 +121,39 @@ describe("channels list — extension session status", () => {
     ]);
     const rows = (await withFormat("json", () => channelListModule.execute())) as any[];
     expect(rows[0].connected).toBe(false);
-    expect(rows[0].extension_session).toBe("matched");
+    expect(rows[0].browser_session).toBe("matched");
+  });
+});
+
+describe("channels list — output shape", () => {
+  it("should not carry send_path, which repeated one org-level value per platform", async () => {
+    stubChannels([channel({ activeSessionClient: "EXTENSION", extensionSessionCheckedAt: RECENT })]);
+    const rows = (await withFormat("json", () => channelListModule.execute())) as any[];
+    expect(rows[0]).not.toHaveProperty("send_path");
+  });
+
+  it("should keep the browser_session column when an api-routed channel sorts first", async () => {
+    stubChannels([
+      channel({ id: "ch_li", identifier: "linkedin", activeSessionClient: "API" }),
+      channel({
+        activeSessionClient: "EXTENSION",
+        extensionSessionCheckedAt: RECENT,
+        extensionSessionStale: false,
+      }),
+    ]);
+    const out = (await withFormat("table", () => channelListModule.execute())) as string;
+    expect(out).toContain("browser_session");
+    expect(out).toContain("matched");
   });
 });
 
 describe("channels list — notes", () => {
-  it("should point the reader at extension_session instead of connected", async () => {
+  it("should point the reader at browser_session instead of connected", async () => {
     stubChannels([channel({ activeSessionClient: "EXTENSION", extensionSessionCheckedAt: RECENT })]);
     const out = (await withFormat("table", () => channelListModule.execute())) as string;
-    expect(out).toContain("extension_session");
+    // Asserting on the sentence, not the bare token: the token is also the
+    // column header, so it is present whether or not the note survives.
+    expect(out).toContain("read 'browser_session' — not 'connected'");
   });
 
   it("should soften a not_matched verdict on quora, whose probe is unreliable", async () => {

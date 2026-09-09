@@ -2,7 +2,7 @@
 
 ## Global Options
 
-Available on every command. Built-in apcore options are hidden by default; pass `--all-options` to reveal them.
+Available on every command. Built-in apcore options are hidden by default; pass `--all-options` to reveal them (`aisee <command> --help --all-options` for a command, `aisee --help --all-options` for the summary at the root).
 
 | Flag | Default | Description |
 |---|---|---|
@@ -394,17 +394,30 @@ server-side, so a stale or wrong plan ID cannot be sent.
 ## Channels
 
 ### `aisee channels list`
-List all connected social media accounts, their connection status, and the send path each one
-resolves to.
+List all connected social media accounts and their status.
 
 ```bash
 aisee channels list
 aisee channels list --format json
 ```
 
-The `send_path` column comes from the backend's own resolution: `api` means the server publishes it,
-`extension` means the AISee browser extension publishes it from your signed-in Chrome. An empty
-value means no send path is currently viable — usually a missing or disabled account.
+A row that carries `browser_session` is published from your signed-in Chrome by the AISee browser
+extension, not by the server. On those rows `connected` is the wrong field to read — it only tracks
+the server-side OAuth credential, and a channel with a stale token still posts through the browser
+perfectly well. Read `browser_session` instead:
+
+| Value | Meaning |
+|---|---|
+| `matched` | The browser is signed into this account — posts can go out |
+| `not_matched` | Checked recently, and the browser is signed into a different account (or none). `browser_signed_in_as` names who it is |
+| `stale` | Reported once, too long ago to act on — usually the browser has been closed since |
+| `unknown` | Never reported: an extension too old to report, or one that has not run its pass here yet |
+
+On `quora` and `devto` the sign-in probe is less reliable (both serve signed-out visitors the same
+cookies), so `not_matched` there is worth checking by hand.
+
+Rows without `browser_session` are published by the server, where the browser session has no
+bearing on whether a post goes out.
 
 ### `aisee channels add <platform>`
 Connect a new social media account via browser OAuth.

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- `channels list` renames `extension_session` to `browser_session`, pairing it with the existing `browser_signed_in_as`. The four states (`matched`, `not_matched`, `stale`, `unknown`) are unchanged — the backend's own two-valued `activeSessionClient` cannot express `stale` or `unknown`, and reporting it raw would show a never-probed channel as if the browser were signed out.
+- `channels list` drops `send_path`. It was org-level config keyed by platform, so every channel on a platform repeated the same value; the presence of `browser_session` now marks a browser-published channel. Per-post send paths are unaffected and still reported by `post list`.
+- The root `aisee --help` now names `--format` and `--fields` directly instead of hiding them behind `--all-options`.
+
+### Fixed
+- `--all-options` now actually reveals the built-in options (`--format`, `--fields`, `--dry-run`, ...) in command help; the flag was accepted but never forwarded to the CLI builder.
+- `channels list` in table format no longer drops the `browser_session` column when a server-published channel happens to sort first — the plain-text table sized its columns from the first row alone.
+- Top-level `aisee --help` lists the common per-command options, so output formats such as `--format json` are discoverable from the root help.
+
 ## [0.7.0] - 2026-09-04
 
 ### Added

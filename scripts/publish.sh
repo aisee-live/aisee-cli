@@ -19,7 +19,12 @@ while [ $# -gt 0 ]; do
     --dry-run)      DRY_RUN=1 ;;
     --npm-only)     NPM_ONLY=1 ;;
     --release-only) RELEASE_ONLY=1 ;;
-    --tag)          TAG="$2"; shift ;;
+    --tag)
+      if [ $# -lt 2 ]; then
+        echo "ERROR: --tag requires a value (e.g. --tag next)." >&2
+        exit 1
+      fi
+      TAG="$2"; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -53,7 +58,14 @@ elif [ "$RELEASE_ONLY" = "1" ]; then
   echo "  Mode: GitHub release only (npm publish skipped)"
 fi
 
-# ── 2. Build Everything ───────────────────────────────────────────────────────
+# ── 2. Tests and Type Check ───────────────────────────────────────────────────
+echo ""
+echo "==> Running tests and type check..."
+bun test
+bunx tsc --noEmit
+echo "  ✔ Tests and type check passed."
+
+# ── 3. Build Everything ───────────────────────────────────────────────────────
 echo ""
 echo "==> Building JS bundle and all platform binaries..."
 bun run build:all
@@ -63,7 +75,7 @@ if [ ! -f "bin/aisee.js" ]; then
   exit 1
 fi
 
-# ── 3. Pre-publish validation ─────────────────────────────────────────────────
+# ── 4. Pre-publish validation ─────────────────────────────────────────────────
 if [ "$RELEASE_ONLY" = "0" ]; then
   echo ""
   echo "==> Pre-publish validation..."
@@ -82,7 +94,7 @@ if [ "$RELEASE_ONLY" = "0" ]; then
   fi
 fi
 
-# ── 4. Publish main package ───────────────────────────────────────────────────
+# ── 5. Publish main package ───────────────────────────────────────────────────
 if [ "$RELEASE_ONLY" = "0" ]; then
   echo ""
   echo "==> Publishing main package (aisee@$VERSION)..."
@@ -90,11 +102,12 @@ if [ "$RELEASE_ONLY" = "0" ]; then
   npm publish $NPM_FLAGS
 fi
 
-# ── 5. Verify npm publish ─────────────────────────────────────────────────────
+# ── 6. Verify npm publish ─────────────────────────────────────────────────────
 if [ "$RELEASE_ONLY" = "0" ] && [ "$DRY_RUN" = "0" ]; then
   echo ""
   echo "==> Verifying published package (non-fatal)..."
-  if npm install -g "@aisee/aisee@$VERSION" --prefer-online 2>/dev/null && aisee --version 2>/dev/null; then
+  if npm install -g "@aisee/aisee@$VERSION" --prefer-online 2>/dev/null \
+    && [ "$(aisee --version 2>/dev/null)" = "$VERSION" ]; then
     echo "  ✔ Remote verification passed."
   else
     echo "  WARN: Remote verification failed — package may still be propagating to the registry."
@@ -102,7 +115,7 @@ if [ "$RELEASE_ONLY" = "0" ] && [ "$DRY_RUN" = "0" ]; then
   fi
 fi
 
-# ── 6. GitHub Release ─────────────────────────────────────────────────────────
+# ── 7. GitHub Release ─────────────────────────────────────────────────────────
 if [ "$NPM_ONLY" = "0" ]; then
   echo ""
   echo "==> Preparing GitHub Release..."

@@ -8,14 +8,14 @@ Command-line interface for [AISee](https://app.aisee.live) — automate AEO (Ans
 - **AEO Analysis** — scan websites, fetch AI-presence reports, competitor analysis, strategic recommendations.
 - **Action Pipeline** — inspect individual tasks with `action-detail`, generate suggestions with `action-suggest`, and convert them into social media posts with `action-post`.
 - **Social Media Automation** — create, schedule, and publish posts across X, LinkedIn, Reddit, and more.
-- **Structured Output** — every command supports `--format json|table|csv|yaml|jsonl` and `--fields` dot-path selection.
-- **Built on apcore-cli 0.7.0** — audit logging, dry-run preflight, pipeline trace, approval gate.
+- **Structured Output** — every command supports `--format tui|table|markdown|json|csv|yaml|jsonl` and `--fields` dot-path selection.
+- **Built on apcore-cli 0.9** — audit logging, dry-run preflight, pipeline trace, approval gate.
 
 ## Requirements
 
-- **Run (Node.js)**: [Node.js](https://nodejs.org) ≥ 18.0. Standard npm package is lightweight (~2MB).
-- **Run (Standalone)**: No runtime dependency — ships as a self-contained native executable (~60MB).
-- **Build**: [Bun](https://bun.sh) ≥ 1.0 is required to build from source.
+- **Run (Node.js)**: [Node.js](https://nodejs.org) ≥ 18.0. Standard npm package is lightweight (~0.5MB download, ~3MB on disk).
+- **Run (Standalone)**: No runtime dependency — ships as a self-contained native executable (60-115MB depending on platform).
+- **Build**: [Bun](https://bun.sh) ≥ 1.3 is required to build from source.
 
 ## Installation
 
@@ -36,11 +36,15 @@ bun install -g @aisee/aisee@latest
 
 Download the pre-compiled binary for your platform from the [Releases](https://github.com/aisee-live/aisee-cli/releases) page.
 
+Assets are named per platform — pick the one matching your machine:
+
 ```bash
-# macOS/Linux
-curl -L https://github.com/aisee-live/aisee-cli/releases/latest/download/aisee -o /usr/local/bin/aisee
-chmod +x /usr/local/bin/aisee
+# macOS Apple Silicon (swap for aisee-darwin-x64, aisee-linux-x64, aisee-linux-arm64)
+curl -L https://github.com/aisee-live/aisee-cli/releases/latest/download/aisee-darwin-arm64 -o ~/.local/bin/aisee
+chmod +x ~/.local/bin/aisee
 ```
+
+On Windows, download `aisee-windows-x64.exe` from the same page.
 
 ### macOS/Linux — from source
 
@@ -110,11 +114,11 @@ Output binaries land in `dist/`:
 
 | Layer | Package |
 |---|---|
-| Runtime | Node.js ≥ 18 / Bun ≥ 1.0 / Standalone |
+| Runtime | Node.js ≥ 18 / Bun ≥ 1.3 / Standalone |
 | Language | TypeScript (strict) |
-| Core SDK | `apcore-js` ≥ 0.19.0 |
-| CLI SDK | `apcore-cli` 0.7.0 |
-| Toolkit | `apcore-toolkit` ≥ 0.5.0 |
+| Core SDK | `apcore-js` ^0.21.1 |
+| CLI SDK | `apcore-cli` ^0.9.0 |
+| Toolkit | `apcore-toolkit` ^0.7.0 |
 | Schema | Zod v3 |
 
 ---

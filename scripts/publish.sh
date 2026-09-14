@@ -80,15 +80,30 @@ if [ "$RELEASE_ONLY" = "0" ]; then
   echo ""
   echo "==> Pre-publish validation..."
   if [ "$DRY_RUN" = "1" ]; then
-    echo "[dry-run] Would run: npm install -g . && aisee --version"
+    echo "[dry-run] Would run: npm install -g . && \"\$(npm prefix -g)/bin/aisee\" --version"
   else
     echo "  Installing local version globally for testing..."
     npm install -g .
 
-    INSTALLED_VER=$(aisee --version)
-    if [ "$INSTALLED_VER" != "$VERSION" ]; then
-      echo "  ERROR: Version mismatch! Expected $VERSION, got $INSTALLED_VER"
+    # Validate the binary npm just installed, not whatever `aisee` resolves to:
+    # scripts/install.sh drops a standalone binary in $HOME/.local/bin, which
+    # usually shadows the npm global bin on PATH.
+    NPM_BIN="$(npm prefix -g)/bin/aisee"
+    if [ ! -x "$NPM_BIN" ]; then
+      echo "  ERROR: npm install -g . did not produce an executable at $NPM_BIN" >&2
       exit 1
+    fi
+
+    INSTALLED_VER=$("$NPM_BIN" --version)
+    if [ "$INSTALLED_VER" != "$VERSION" ]; then
+      echo "  ERROR: Version mismatch! Expected $VERSION, got $INSTALLED_VER ($NPM_BIN)"
+      exit 1
+    fi
+
+    SHADOWING_BIN=$(command -v aisee 2>/dev/null || true)
+    if [ -n "$SHADOWING_BIN" ] && [ "$SHADOWING_BIN" != "$NPM_BIN" ]; then
+      echo "  NOTE: \`aisee\` on your PATH is $SHADOWING_BIN ($("$SHADOWING_BIN" --version 2>/dev/null || echo unknown)),"
+      echo "  NOTE: which shadows the npm global install. Publishing is unaffected."
     fi
     echo "  ✔ Pre-publish validation passed (aisee $INSTALLED_VER)."
   fi
@@ -107,7 +122,7 @@ if [ "$RELEASE_ONLY" = "0" ] && [ "$DRY_RUN" = "0" ]; then
   echo ""
   echo "==> Verifying published package (non-fatal)..."
   if npm install -g "@aisee/aisee@$VERSION" --prefer-online 2>/dev/null \
-    && [ "$(aisee --version 2>/dev/null)" = "$VERSION" ]; then
+    && [ "$("$(npm prefix -g)/bin/aisee" --version 2>/dev/null)" = "$VERSION" ]; then
     echo "  ✔ Remote verification passed."
   else
     echo "  WARN: Remote verification failed — package may still be propagating to the registry."

@@ -80,10 +80,12 @@ if [ "$RELEASE_ONLY" = "0" ]; then
   echo ""
   echo "==> Pre-publish validation..."
   if [ "$DRY_RUN" = "1" ]; then
-    echo "[dry-run] Would run: npm install -g . && \"\$(npm prefix -g)/bin/aisee\" --version"
+    echo "[dry-run] Would run: npm install -g . --force && \"\$(npm prefix -g)/bin/aisee\" --version"
   else
     echo "  Installing local version globally for testing..."
-    npm install -g .
+    # --force: without it npm reports "up to date" when the same version is
+    # already installed globally, leaving a stale bundle to validate.
+    npm install -g . --force
 
     # Validate the binary npm just installed, not whatever `aisee` resolves to:
     # scripts/install.sh drops a standalone binary in $HOME/.local/bin, which

@@ -55,16 +55,13 @@ function deriveBrowserSessionStatus(ch: {
 }
 
 /**
- * The backend never sends an EXTENSION-routed post itself — the user's own
- * Chrome does, via the extension's publish-due loop. A post that comes back
- * QUEUE on that path was not published, and saying nothing about it is how a
- * user ends up waiting on a post that will never go out.
+ * Queued extension work still needs an eligible browser executor.
  */
 function extensionNotice(publishMethod: unknown): string | undefined {
   if (String(publishMethod ?? "").toUpperCase() !== "EXTENSION") return undefined;
   return (
-    "Queued for the AISee browser extension — it publishes from your signed-in Chrome, " +
-    "not from the server. It stays in QUEUE until that browser is running."
+    "Queued for the AISee browser extension. An eligible browser node must be online " +
+    "and signed in to the sending account. QUEUE does not mean published."
   );
 }
 
@@ -676,8 +673,7 @@ export const postPublishModule = {
   outputSchema: z.any(),
   async execute(input: any) {
     if (input.retry) {
-      // /posts/{id}/retry is ERROR-only and additionally requires a bound,
-      // enabled integration — an account-less extension post can never use it.
+      // Controlled records also require the backend's retry action to be allowed.
       return await postAgentClient.retryPost(input.id);
     }
 
@@ -726,8 +722,29 @@ export const postPublishModule = {
   }
 };
 
+export const postStatusModule = {
+  description: "Read a post's sending status, account, execution and allowed actions",
+  inputSchema: z.object({ id: z.string().describe("Original post ID") }),
+  outputSchema: z.any(),
+  async execute(input: any) {
+    const data = await postAgentClient.getPost(input.id);
+    const fmt = getFmt();
+    if (fmt !== "table" && fmt !== "markdown") return data;
+    const root = data.posts?.[0];
+    const sending = data.sending;
+    const summary = Object.fromEntries(Object.entries({
+      post_id: sending?.rootPostId ?? root?.id ?? input.id,
+      state: root?.state ?? "unknown",
+      ...(sending ?? {}),
+    }).map(([key, value]) => [key, value !== null && typeof value === "object" ? JSON.stringify(value) : value]));
+    return fmt === "markdown"
+      ? `# Post Status\n\n${mdKeyValueTable(summary)}\n`
+      : formatKV(summary);
+  },
+};
+
 export const postPendingModule = {
-  description: "Count posts queued for the browser extension to publish",
+  description: "Count legacy extension queue posts; use post status for controlled sending",
   // Org-wide by design: GET /posts/publish-due/count takes no parameters, so
   // there is no project-scoped variant to offer.
   inputSchema: z.object({}),
@@ -747,12 +764,12 @@ export const postPendingModule = {
       scheduled_ahead: Number(record.scheduledAhead ?? 0),
     };
     const waiting = counts.due_now + counts.leased;
-    const note = waiting > 0
-      ? "These publish from your signed-in Chrome, not from the server — that browser must be running."
-      : "";
+    const note = "These counts cover the legacy extension queue only, excluding controlled multi-node work. " +
+      "Use 'aisee post status <id>' for sending status." +
+      (waiting > 0 ? " An eligible browser node must be online and signed in to the sending account." : "");
 
     if (effectiveFmt === "markdown") {
-      const parts = ["# Pending Extension Publishes", "", mdKeyValueTable(counts)];
+      const parts = ["# Pending Legacy Extension Publishes", "", mdKeyValueTable(counts)];
       if (note) parts.push("", `> ${note}`);
       return parts.join("\n") + "\n";
     }

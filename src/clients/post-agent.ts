@@ -422,8 +422,20 @@ export const postAgentClient = {
     return response.data as ScheduleResult;
   },
 
-  /** Retry a post the backend already tried and failed. ERROR state only. */
+  async getPost(postId: string) {
+    const response = await cx(postAgentAxios.get(`/posts/${postId}`));
+    return response.data;
+  },
+
+  /** The backend remains authoritative if eligibility changes after this read. */
   async retryPost(postId: string) {
+    const current = await this.getPost(postId);
+    if (current.sending && current.sending.allowedActions?.retry?.allowed !== true) {
+      throw new UserError(
+        `Post cannot be retried: ${current.sending.allowedActions?.retry?.reason ?? "SEND_RETRY_UNSAFE"}. ` +
+        `Check 'aisee post status ${postId}' before attempting another send.`,
+      );
+    }
     const response = await cx(postAgentAxios.post(`/posts/${postId}/retry`));
     return response.data;
   },

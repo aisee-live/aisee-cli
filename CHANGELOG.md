@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.3] - 2026-11-02
+
+### Added
+- `aisee post status <id>` reads the original post together with its sending summary: account, pause state, execution, segments, and allowed actions. The controlled `RECONCILING` and `PARTIAL_SUCCESS` states can differ from the legacy post state.
+
+### Changed
+- `aisee post publish --retry` now reads the original post first and retries only when `sending.allowedActions.retry.allowed` is `true`; uncertain or partially confirmed outcomes must be reconciled before another send. The backend rechecks eligibility on the retry itself.
+- `aisee post pending` now reports the legacy browser-extension queue only. These counts exclude controlled multi-node work and point at `aisee post status <id>` for per-post progress.
+- Extension-routing notices now state that an eligible browser node must be online and signed in to the sending account, instead of claiming the post publishes only from the local signed-in Chrome.
+
+## [0.7.2] - 2026-09-14
 
 ### Changed
 - `channels list` renames `extension_session` to `browser_session`, pairing it with the existing `browser_signed_in_as`. The four states (`matched`, `not_matched`, `stale`, `unknown`) are unchanged — the backend's own two-valued `activeSessionClient` cannot express `stale` or `unknown`, and reporting it raw would show a never-probed channel as if the browser were signed out.

@@ -247,7 +247,7 @@ describe("postAgentClient.retryPost", () => {
 
     await postAgentClient.retryPost("p1");
 
-    expect(calls[0]).toMatchObject({ method: "post", url: "/posts/p1/retry" });
+    expect(calls.at(-1)).toMatchObject({ method: "post", url: "/posts/p1/retry" });
   });
 });
 

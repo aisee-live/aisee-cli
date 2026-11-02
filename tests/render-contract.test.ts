@@ -55,7 +55,7 @@ describe("post pending", () => {
 
     const out = await withFormat("table", () => postPendingModule.execute()) as string;
 
-    expect(out).toContain("signed-in Chrome");
+    expect(out).toContain("eligible browser node");
   });
 
   it("should stay quiet when the queue is empty", async () => {
@@ -63,7 +63,7 @@ describe("post pending", () => {
 
     const out = await withFormat("table", () => postPendingModule.execute()) as string;
 
-    expect(out).not.toContain("signed-in Chrome");
+    expect(out).not.toContain("eligible browser node");
     expect(out).toMatch(/scheduled_ahead\s+4/);
   });
 
@@ -126,7 +126,7 @@ describe("post create", () => {
 
     expect(out).toContain("QUEUE");
     expect(out).toContain("EXTENSION");
-    expect(out).toContain("signed-in Chrome");
+    expect(out).toContain("eligible browser node");
   });
 
   it("should not claim a send path for an API-routed post", async () => {
@@ -135,7 +135,7 @@ describe("post create", () => {
     const out = await withFormat("table", () =>
       postCreateModule.execute({ text: "Hello", channel: "ch_x", draft: false })) as string;
 
-    expect(out).not.toContain("signed-in Chrome");
+    expect(out).not.toContain("eligible browser node");
   });
 
   it("should reject --draft together with --schedule", async () => {
@@ -154,7 +154,7 @@ describe("post publish", () => {
       postPublishModule.execute({ id: "p1", retry: false })) as string;
 
     expect(out).toContain("p1 queued via extension");
-    expect(out).toContain("signed-in Chrome");
+    expect(out).toContain("eligible browser node");
   });
 
   it("should explain INVALID_STATE by pointing at --retry", async () => {
@@ -190,7 +190,7 @@ describe("post publish", () => {
 
     await withFormat("json", () => postPublishModule.execute({ id: "p1", retry: true }));
 
-    expect(calls[0]).toMatchObject({ method: "post", url: "/posts/p1/retry" });
+    expect(calls.at(-1)).toMatchObject({ method: "post", url: "/posts/p1/retry" });
   });
 });
 

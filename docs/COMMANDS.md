@@ -220,9 +220,10 @@ body. Passing one that the target platform does not use is harmless.
 
 > **Not every post is sent by the server.** Platforms routed to the browser extension
 > (`hackernews`, `medium`, `quora` by default, and possibly `x`, `reddit`, `linkedin`, `devto`
-> depending on the deployment) are published from your own signed-in Chrome by the AISee browser
-> extension — not from the backend. Those posts stay in `QUEUE` until that browser runs. The
-> command reports the resolved send path, and `aisee post pending` counts what is waiting.
+> depending on the deployment) require an eligible browser node signed in to the sending account.
+> In controlled mode the backend coordinates matching nodes; the current browser need not execute
+> the post. `QUEUE` means queued, not published. Use `aisee post status <id>` for progress.
+> Controlled sending requires a project; supply `--project` when creating a post.
 
 ### `aisee post list`
 List recent posts with optional status filter.
@@ -279,14 +280,26 @@ aisee post publish abc-123 --retry
 | `--publish-method <m>` | — | Force `extension` or `api`; omit to let the backend resolve it |
 
 A post already in `QUEUE` or `PUBLISHED` is reported as a no-op, not as a fresh publish. Committing
-a post in `ERROR` fails with `INVALID_STATE` — use `--retry` for those.
+a post in `ERROR` fails with `INVALID_STATE`. Controlled retries first read the original post
+and require `sending.allowedActions.retry.allowed=true`; uncertain or partially confirmed outcomes
+must be resolved before another send. The backend rechecks eligibility on retry.
 
 ### `aisee post pending`
-Count posts waiting for the browser extension to publish. Organization-wide: the underlying
-endpoint takes no filters.
+Count posts in the **legacy** browser extension queue. These counts exclude controlled multi-node
+work. Organization-wide: the endpoint takes no filters. Machine-readable output retains the original
+count fields. Use `aisee post status <id>` to inspect controlled work.
 
 ```bash
 aisee post pending
+```
+
+### `aisee post status <id>`
+Read the original post and its sending summary, including account, pause state, execution, segments
+and allowed actions. `RECONCILING` and `PARTIAL_SUCCESS` can differ from the legacy post state.
+
+```bash
+aisee post status abc-123
+aisee post status abc-123 --format json
 ```
 
 ### `aisee post schedule <id> <time>`
